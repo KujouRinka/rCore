@@ -33,7 +33,7 @@ impl KernelStack {
   pub fn push_context(&self, cx: TrapContext) -> &'static mut TrapContext {
     let cx_ptr = (self.get_sp() - core::mem::size_of::<TrapContext>()) as *mut TrapContext;
     unsafe {
-      core::ptr::write(cx_ptr, cx);
+      *cx_ptr = cx;
       cx_ptr.as_mut().unwrap()
     }
   }
