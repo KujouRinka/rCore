@@ -1,2 +1,5 @@
 /target
 /.idea
+src/link_app.S
+run.sh
+run.log

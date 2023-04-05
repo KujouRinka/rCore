@@ -13,3 +13,6 @@ $(KERNEL_ELF): $(SOURCES)
 
 run: $(KERNEL_BIN)
 	qemu-system-riscv64 -machine virt -bios $(SBI_PATH) -nographic $(DEVICE_PARAM)
+
+run-gdb: $(KERNEL_BIN)
+	qemu-system-riscv64 -machine virt -bios $(SBI_PATH) -nographic $(DEVICE_PARAM) -s -S

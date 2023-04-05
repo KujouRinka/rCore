@@ -6,12 +6,16 @@ mod console;
 mod lang_items;
 mod sbi;
 mod logging;
+mod batch;
+mod sync;
+mod trap;
+mod syscall;
 
 use core::arch::global_asm;
 use log::{debug, error, info, LevelFilter, trace, warn};
-use crate::sbi::shutdown;
 
 global_asm!(include_str!("entry.asm"));
+global_asm!(include_str!("link_app.S"));
 
 extern "C" {
   fn stext();
@@ -55,5 +59,7 @@ pub fn rust_main() -> ! {
         boot_stack_top as usize, boot_stack_lower_bound as usize
     );
   error!("[kernel] .bss [{:#x}, {:#x})", sbss as usize, ebss as usize);
-  shutdown()
+  trap::init();
+  batch::init();
+  batch::run_next_app();
 }
