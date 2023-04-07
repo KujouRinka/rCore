@@ -1,34 +1,12 @@
-#![no_std]
-#![no_main]
-
 use core::arch::asm;
+use crate::println;
 
-#[macro_use]
-extern crate user_lib;
-
-#[no_mangle]
-fn main() -> i32 {
-  // print_stack();
-  recursive(5);
-  0
-}
-
-fn recursive(i: i32) {
-  if i == 0 {
-    unsafe {
-      print_stack_trace();
-    }
-    return;
-  }
-  // run this without optimization
-  recursive(i - 1);
-}
-
-unsafe fn print_stack_trace() {
+pub unsafe fn print_stack_trace() {
   let mut cur_fp: usize;
   // load riscv64 stack pointer
   asm!("mv {}, fp", out(reg) cur_fp);
   let mut cnt = 0;
+  println!("== Begin stack trace ==");
   while cur_fp != 0 {
     unsafe {
       let ra = *((cur_fp - 8) as *const usize);
@@ -37,4 +15,5 @@ unsafe fn print_stack_trace() {
     }
     cnt += 1;
   }
+  println!("== End stack trace ==");
 }

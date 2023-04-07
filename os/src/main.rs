@@ -10,6 +10,7 @@ mod batch;
 mod sync;
 mod trap;
 mod syscall;
+mod stack_trace;
 
 use core::arch::global_asm;
 use log::{debug, error, info, LevelFilter, trace, warn};

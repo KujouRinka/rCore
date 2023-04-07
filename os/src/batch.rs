@@ -100,7 +100,9 @@ impl AppManager {
   }
 }
 
-
+pub fn get_taskid() -> usize {
+  APP_MANAGER.exclusive_access().get_current_app()
+}
 
 lazy_static! {
   static ref APP_MANAGER: UPSafeCell<AppManager> = unsafe {
