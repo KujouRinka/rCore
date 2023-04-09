@@ -7,9 +7,9 @@ use riscv::register::{
   stvec,
   scause,
 };
-use crate::batch::run_next_app;
 use crate::trap::context::TrapContext;
 use crate::syscall::syscall;
+use crate::task::exit_current_and_run_next;
 
 pub mod context;
 
@@ -35,14 +35,15 @@ pub fn trap_handler(cx: &mut TrapContext) -> &mut TrapContext {
     Trap::Exception(Exception::StoreFault)
     | Trap::Exception(Exception::StorePageFault) => {
       warn!("[kernel] PageFault in application, kernel kill it.");
-      run_next_app();
+      exit_current_and_run_next();
     }
     Trap::Exception(Exception::IllegalInstruction) => {
       warn!("[kernel] IllegalInstruction in application, kernel killed it.");
-      run_next_app();
+      exit_current_and_run_next();
     }
     _ => {
-      panic!("Unsupported trap {:?}, stval = {:#x}", scause.cause(), stval);
+      warn!("Unsupported trap {:?}, stval = {:#x}", scause.cause(), stval);
+      exit_current_and_run_next();
     }
   }
   cx

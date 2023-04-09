@@ -1,11 +1,20 @@
-use crate::batch::{get_taskid, run_next_app};
 use crate::println;
+use crate::task::{
+  suspend_current_and_run_next,
+  exit_current_and_run_next,
+  get_current_task_id,
+};
 
 pub fn sys_exit(xstate: i32) -> ! {
   println!("[kernel] Application exited with code {}", xstate);
-  run_next_app()
+  exit_current_and_run_next()
 }
 
 pub fn sys_get_taskinfo() -> isize {
-  get_taskid() as isize - 1
+  get_current_task_id()
+}
+
+pub fn sys_yield() -> isize {
+  suspend_current_and_run_next();
+  0
 }

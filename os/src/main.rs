@@ -6,11 +6,13 @@ mod console;
 mod lang_items;
 mod sbi;
 mod logging;
-mod batch;
 mod sync;
 mod trap;
 mod syscall;
 mod stack_trace;
+mod config;
+mod loader;
+mod task;
 
 use core::arch::global_asm;
 use log::{debug, error, info, LevelFilter, trace, warn};
@@ -61,6 +63,7 @@ pub fn rust_main() -> ! {
     );
   error!("[kernel] .bss [{:#x}, {:#x})", sbss as usize, ebss as usize);
   trap::init();
-  batch::init();
-  batch::run_next_app();
+  loader::load_apps();
+  task::run_first_task();
+  panic!("Unreachable in rust_main")
 }

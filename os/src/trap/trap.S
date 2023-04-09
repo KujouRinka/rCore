@@ -11,6 +11,7 @@
 __alltraps:
     # swap sp and sscratch
     csrrw sp, sscratch, sp
+    # MAY REMOVE THIS INSTRUCTION
     addi sp, sp, -34*8
     sd x1, 1*8(sp)
     sd x3, 3*8(sp)
@@ -32,7 +33,7 @@ __alltraps:
 
     .globl __restore
 __restore:
-    mv sp, a0
+    # mv sp, a0
     # read sstatus
     ld t0, 32*8(sp)
     # read sepc
@@ -49,6 +50,7 @@ __restore:
         LOAD_GP %n
         .set n, n+1
     .endr
+    # MAY REMOVE THIS INSTRUCTION
     addi sp, sp, 34*8
     csrrw sp, sscratch, sp
     sret
