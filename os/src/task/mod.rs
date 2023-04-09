@@ -105,6 +105,7 @@ lazy_static! {
   };
 }
 
+// This is same as yield()
 pub fn suspend_current_and_run_next() {
   mark_current_suspended();
   run_next_task();

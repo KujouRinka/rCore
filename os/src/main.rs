@@ -13,6 +13,7 @@ mod stack_trace;
 mod config;
 mod loader;
 mod task;
+mod timer;
 
 use core::arch::global_asm;
 use log::{debug, error, info, LevelFilter, trace, warn};
@@ -64,6 +65,8 @@ pub fn rust_main() -> ! {
   error!("[kernel] .bss [{:#x}, {:#x})", sbss as usize, ebss as usize);
   trap::init();
   loader::load_apps();
+  trap::enable_timer_interrupt();
+  timer::set_next_trigger();
   task::run_first_task();
   panic!("Unreachable in rust_main")
 }
