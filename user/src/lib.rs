@@ -33,18 +33,43 @@ fn clear_bss() {
 
 use syscall::*;
 
+pub const MAX_SYSCALL_NUM: usize = 411;
+
 pub fn write(fd: usize, buf: &[u8]) -> isize {
     sys_write(fd, buf)
 }
 pub fn exit(exit_code: i32) -> isize {
     sys_exit(exit_code)
 }
-pub fn get_taskinfo() -> isize {
-    sys_get_taskinfo()
+pub fn get_taskinfo(id: usize, ts: *mut TaskInfo) -> isize {
+    sys_get_taskinfo(id, ts)
 }
 pub fn yield_() -> isize {
     sys_yield()
 }
 pub fn get_time() -> isize {
     sys_get_time()
+}
+
+#[derive(Copy, Clone, Debug)]
+#[repr(C)]
+pub struct SyscallInfo {
+  pub times: usize,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum TaskStatus {
+  UnInit,
+  Ready,
+  Running,
+  Exited,
+}
+
+#[derive(Copy, Clone, Debug )]
+#[repr(C)]
+pub struct TaskInfo {
+  pub id: usize,
+  pub status: TaskStatus,
+  pub call: [SyscallInfo; MAX_SYSCALL_NUM],
+  pub time: usize,
 }

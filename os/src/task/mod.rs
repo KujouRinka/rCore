@@ -7,14 +7,16 @@ use crate::loader::{get_num_app, init_app_cx};
 use crate::sbi::shutdown;
 use crate::task::context::TaskContext;
 use switch::__switch;
+use crate::timer::get_time;
+use crate::syscall::{MAX_SYSCALL_NUM, SyscallInfo};
 
 mod switch;
 mod context;
-mod task;
+pub(crate) mod task;
 
 pub struct TaskManager {
-  num_app: usize,
-  inner: UPSafeCell<TaskManagerInner>,
+  pub(crate) num_app: usize,
+  pub(crate) inner: UPSafeCell<TaskManagerInner>,
 }
 
 impl TaskManager {
@@ -74,9 +76,9 @@ impl TaskManager {
   }
 }
 
-struct TaskManagerInner {
-  tasks: [TaskControlBlock; MAX_APP_NUM],
-  current_task: usize,
+pub(crate) struct TaskManagerInner {
+  pub(crate) tasks: [TaskControlBlock; MAX_APP_NUM],
+  pub(crate) current_task: usize,
 }
 
 lazy_static! {
@@ -86,12 +88,15 @@ lazy_static! {
       TaskControlBlock {
         task_cx: TaskContext::zero_init(),
         task_status: TaskStatus::UnInit,
+        call: [SyscallInfo::new(); MAX_SYSCALL_NUM],
+        start_time: 0,
       };
       MAX_APP_NUM
     ];
     for i in 0..num_app {
       tasks[i].task_cx = TaskContext::goto_restore(init_app_cx(i));
       tasks[i].task_status = TaskStatus::Ready;
+      tasks[i].start_time = get_time();
     }
     TaskManager {
       num_app,

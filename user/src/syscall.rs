@@ -1,10 +1,11 @@
 use core::arch::asm;
+use crate::TaskInfo;
 
 const SYSCALL_WRITE: usize = 64;
 const SYSCALL_EXIT: usize = 93;
 const SYSCALL_YIELD: usize = 124;
 const SYSCALL_GET_TIME: usize = 169;
-const SYSCALL_GET_TASKINFO: usize = 114514;
+const SYSCALL_GET_TASKINFO: usize = 410;
 
 fn syscall(id: usize, args: [usize; 3]) -> isize {
     let mut ret: isize;
@@ -28,8 +29,8 @@ pub fn sys_exit(exit_code: i32) -> isize {
     syscall(SYSCALL_EXIT, [exit_code as usize, 0, 0])
 }
 
-pub fn sys_get_taskinfo() -> isize {
-    syscall(SYSCALL_GET_TASKINFO, [0, 0, 0])
+pub fn sys_get_taskinfo(id: usize, ts: *mut TaskInfo) -> isize {
+    syscall(SYSCALL_GET_TASKINFO, [id, ts as usize, 0])
 }
 
 pub fn sys_yield() -> isize {
