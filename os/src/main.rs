@@ -1,6 +1,9 @@
 #![feature(panic_info_message)]
+#![feature(alloc_error_handler)]
 #![no_std]
 #![no_main]
+
+extern crate alloc;
 
 mod console;
 mod lang_items;
@@ -14,6 +17,7 @@ mod config;
 mod loader;
 mod task;
 mod timer;
+mod mm;
 
 use core::arch::global_asm;
 use log::{debug, error, info, LevelFilter, trace, warn};
@@ -21,20 +25,11 @@ use log::{debug, error, info, LevelFilter, trace, warn};
 global_asm!(include_str!("entry.asm"));
 global_asm!(include_str!("link_app.S"));
 
-extern "C" {
-  fn stext();
-  fn etext();
-  fn srodata();
-  fn erodata();
-  fn sdata();
-  fn edata();
-  fn boot_stack_top();
-  fn boot_stack_lower_bound();
-  fn sbss();
-  fn ebss();
-}
-
 pub fn clear_bss() {
+  extern "C" {
+    fn sbss();
+    fn ebss();
+  }
   (sbss as usize..ebss as usize).for_each(|x| {
     unsafe { (x as *mut u8).write_volatile(0) }
   });
@@ -42,7 +37,21 @@ pub fn clear_bss() {
 
 #[no_mangle]
 pub fn rust_main() -> ! {
+  extern "C" {
+    fn stext();
+    fn etext();
+    fn srodata();
+    fn erodata();
+    fn sdata();
+    fn edata();
+    fn boot_stack_top();
+    fn boot_stack_lower_bound();
+    fn sbss();
+    fn ebss();
+  }
   clear_bss();
+  mm::init();
+  mm::heap_test();
   logging::init(LevelFilter::Info.into());
   println!("hello world");
   trace!(
