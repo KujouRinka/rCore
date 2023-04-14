@@ -1,6 +1,7 @@
 use buddy_system_allocator::LockedHeap;
+use log::debug;
 use crate::config::KERNEL_HEAP_SIZE;
-use crate::println;
+use crate::vars::{ebss, sbss};
 
 #[global_allocator]
 static HEAP_ALLOCATOR: LockedHeap<32> = LockedHeap::empty();
@@ -24,10 +25,6 @@ pub fn init_heap() {
 pub fn heap_test() {
   use alloc::boxed::Box;
   use alloc::vec::Vec;
-  extern "C" {
-    fn sbss();
-    fn ebss();
-  }
   let bss_range = sbss as usize..ebss as usize;
   let a = Box::new(5);
   assert_eq!(*a, 5);
@@ -42,5 +39,5 @@ pub fn heap_test() {
   }
   assert!(bss_range.contains(&(v.as_ptr() as usize)));
   drop(v);
-  println!("heap_test passed!");
+  debug!("heap_test passed!");
 }
