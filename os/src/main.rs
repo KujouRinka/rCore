@@ -5,6 +5,9 @@
 
 extern crate alloc;
 
+#[macro_use]
+extern crate bitflags;
+
 mod console;
 mod lang_items;
 mod sbi;
@@ -18,18 +21,16 @@ mod loader;
 mod task;
 mod timer;
 mod mm;
+mod vars;
 
 use core::arch::global_asm;
 use log::{debug, error, info, LevelFilter, trace, warn};
+use vars::*;
 
 global_asm!(include_str!("entry.asm"));
 global_asm!(include_str!("link_app.S"));
 
 pub fn clear_bss() {
-  extern "C" {
-    fn sbss();
-    fn ebss();
-  }
   (sbss as usize..ebss as usize).for_each(|x| {
     unsafe { (x as *mut u8).write_volatile(0) }
   });
@@ -37,22 +38,10 @@ pub fn clear_bss() {
 
 #[no_mangle]
 pub fn rust_main() -> ! {
-  extern "C" {
-    fn stext();
-    fn etext();
-    fn srodata();
-    fn erodata();
-    fn sdata();
-    fn edata();
-    fn boot_stack_top();
-    fn boot_stack_lower_bound();
-    fn sbss();
-    fn ebss();
-  }
   clear_bss();
   mm::init();
-  mm::heap_test();
-  logging::init(LevelFilter::Info.into());
+  logging::init(LevelFilter::Debug.into());
+  mm::test();
   println!("hello world");
   trace!(
         "[kernel] .text [{:#x}, {:#x})",
