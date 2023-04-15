@@ -1,6 +1,4 @@
 use alloc::collections::BTreeSet;
-// use alloc::vec;
-// use alloc::vec::Vec;
 use bitflags::*;
 use crate::config::PTE_FLAGS_BITS;
 use crate::mm::address::{PhysPageNum, VirtPageNum};
@@ -63,8 +61,7 @@ impl PageTableEntry {
 
 pub struct PageTable {
   root_ppn: PhysPageNum,
-  // frames: Vec<FrameTracker>,
-  frames: BTreeSet<FrameTracker>,
+  frames_holder: BTreeSet<FrameTracker>,
 }
 
 impl PageTable {
@@ -72,16 +69,18 @@ impl PageTable {
     let frame = frame_alloc().unwrap();
     Self {
       root_ppn: frame.ppn,
-      // frames: vec![frame],
-      frames: BTreeSet::new(),
+      frames_holder: {
+        let mut b = BTreeSet::new();
+        b.insert(frame);
+        b
+      },
     }
   }
 
   pub fn from_token(satp: usize) -> Self {
     Self {
       root_ppn: satp.into(),
-      // frames: Vec::new(),
-      frames: BTreeSet::new(),
+      frames_holder: BTreeSet::new(),
     }
   }
 
@@ -93,38 +92,49 @@ impl PageTable {
     self.find_pte(vpn).map(|pte| *pte)
   }
 
-  pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags) {
+  pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags, mut frame: Option<FrameTracker>) {
     let pte = self.find_pte_create(vpn).unwrap();
     assert!(!pte.is_valid(), "vpn {:?} is mapped but should not", vpn);
+
+    // update pte permission
     *pte = PageTableEntry::new(ppn, flags | PTEFlags::V);
+    // hold this page
+    if let Some(ft) = frame.take() {
+      assert_eq!(ppn, ft.ppn, "map: ppn and frame.ppn should equal");
+      self.frames_holder.insert(ft);
+    }
   }
 
-  pub fn unmap(&mut self, vpn: VirtPageNum) {
+  pub fn unmap(&mut self, vpn: VirtPageNum, dealloc: bool) {
     let pte = self.find_pte(vpn).unwrap();
     assert!(pte.is_valid(), "vpn {:?} should mapped but not", vpn);
     *pte = PageTableEntry::empty();
-    // TODO: release record in self.frames
-    let key_to_remove = FrameTrackerMarker::new(pte.ppn()).frame_tracker_ref();
-    self.frames.remove(&key_to_remove);
+    if dealloc {
+      // TODO: release record in self.frames
+      let key_to_remove = FrameTrackerMarker::new(pte.ppn()).frame_tracker_ref();
+      self.frames_holder.remove(&key_to_remove);
+    }
   }
 }
 
 impl PageTable {
-  /// Create a new VA to PA, create a map if not exist.
+  /// Create a new VA to PA, create a map if not exist but not alloc actual page.
   fn find_pte_create(&mut self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
     let index = vpn.indexes();
     let mut ppn = self.root_ppn.clone();
     let mut ret = None;
-    for idx in index.into_iter() {
+    for (i, idx) in index.into_iter().enumerate() {
       let next_pte = &mut ppn.get_pte_array()[idx];
-      if next_pte.flags() | PTEFlags::V == PTEFlags::empty() {
+      if i == 2 {
+        ret = Some(next_pte);
+        break;
+      }
+      if !next_pte.is_valid() {
         let new_frame = frame_alloc().unwrap();
         *next_pte = PageTableEntry::new(new_frame.ppn, PTEFlags::V);
-        // self.frames.push(new_frame);
-        self.frames.insert(new_frame);
+        self.frames_holder.insert(new_frame);
       }
       ppn = next_pte.ppn();
-      ret = Some(next_pte);
     }
     ret
   }

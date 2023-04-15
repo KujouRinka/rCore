@@ -1,4 +1,3 @@
-// use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::arch::asm;
@@ -7,7 +6,7 @@ use lazy_static::lazy_static;
 use log::{debug, trace};
 use riscv::register::satp;
 use crate::config::*;
-use crate::mm::address::{PhysPageNum, VirtAddr, VirtPageNum, VPNRange};
+use crate::mm::address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum, VPNRange};
 use crate::mm::frame_allocator::frame_alloc;
 use crate::mm::page_table::{PageTable, PTEFlags};
 use crate::sync::UPSafeCell;
@@ -55,8 +54,7 @@ impl MemorySet {
     debug!(".rodata [{:#x}, {:#x})", srodata as usize, erodata as usize);
     debug!(".data [{:#x}, {:#x})", sdata as usize, edata as usize);
     debug!(".bss [{:#x}, {:#x})", sbss_with_stack as usize, ebss as usize);
-    debug!("mapping .text section");
-
+    debug!("physical [{:#x}, {:#x})", ekernel as usize, MEMORY_END);
     // map .text section
     memory_set.push(MapArea::new(
       (stext as usize).into(),
@@ -64,7 +62,7 @@ impl MemorySet {
       MapType::Identical,
       MapPermission::R | MapPermission::X,
     ), None);
-    debug!(".text section mapped");
+    debug!("kernel.text section mapped");
 
     // map .rodata section
     memory_set.push(MapArea::new(
@@ -73,7 +71,7 @@ impl MemorySet {
       MapType::Identical,
       MapPermission::R,
     ), None);
-    debug!(".rodata section mapped");
+    debug!("kernel.rodata section mapped");
 
     // map .data section
     memory_set.push(MapArea::new(
@@ -82,7 +80,7 @@ impl MemorySet {
       MapType::Identical,
       MapPermission::R | MapPermission::W,
     ), None);
-    debug!(".data section mapped");
+    debug!("kernel.data section mapped");
 
     // map .bss section
     memory_set.push(MapArea::new(
@@ -91,7 +89,7 @@ impl MemorySet {
       MapType::Identical,
       MapPermission::R | MapPermission::W,
     ), None);
-    debug!(".bss section mapped");
+    debug!("kernel.bss section mapped");
 
     // map physical memory
     memory_set.push(MapArea::new(
@@ -100,7 +98,7 @@ impl MemorySet {
       MapType::Identical,
       MapPermission::R | MapPermission::W,
     ), None);
-    debug!("physical memory mapped");
+    debug!("kernel.physical memory mapped");
     memory_set
   }
 
@@ -161,7 +159,14 @@ impl MemorySet {
   }
 
   fn map_trampoline(&mut self) {
-    todo!()
+    debug!("mapping trampoline");
+    self.page_table.map(
+      VirtAddr::from(TRAMPOLINE).into(),
+      PhysAddr::from(strampoline as usize).into(),
+      PTEFlags::R | PTEFlags::X,
+      None,
+    );
+    debug!("trampoline mapped");
   }
 }
 
@@ -218,7 +223,6 @@ bitflags! {
 
 pub struct MapArea {
   vpn_range: VPNRange,
-  // data_frames: BTreeMap<VirtPageNum, FrameTracker>,
   map_type: MapType,
   map_perm: MapPermission,
 }
@@ -234,7 +238,6 @@ impl MapArea {
     let end = end_va.ceil();
     Self {
       vpn_range: VPNRange::new(start, end),
-      // data_frames: BTreeMap::new(),
       map_type,
       map_perm,
     }
@@ -255,30 +258,28 @@ impl MapArea {
   }
 
   pub fn map_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) {
-    let ppn = match self.map_type {
+    let (ppn, frame_tracker) = match self.map_type {
       MapType::Identical => {
-        PhysPageNum(vpn.0)
+        // Identical map has no need for allocating
+        (PhysPageNum(vpn.0), None)
       }
       MapType::Framed => {
+        // Framed map needs to alloc new page
         let frame = frame_alloc().unwrap();
         let ppn = frame.ppn;
-        // self.data_frames.insert(vpn, frame);
-        ppn
+        (ppn, Some(frame))
       }
     };
     let pte_flags = PTEFlags::from_bits(self.map_perm.bits).unwrap();
-    page_table.map(vpn, ppn, pte_flags);
+    page_table.map(vpn, ppn, pte_flags, frame_tracker);
   }
 
   pub fn unmap_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) {
-    match self.map_type {
-      MapType::Framed => {
-        // NOTE: frame will be freed in `MemorySet::unmap`
-        // self.data_frames.remove(&vpn);
-      }
-      MapType::Identical => {}
-    }
-    page_table.unmap(vpn);
+    let free = match self.map_type {
+      MapType::Identical => false,
+      MapType::Framed => true,
+    };
+    page_table.unmap(vpn, free);
   }
 
   /// Copy `data` to physical addr
