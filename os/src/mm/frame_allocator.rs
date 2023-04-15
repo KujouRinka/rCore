@@ -1,10 +1,11 @@
 use alloc::vec::Vec;
 use core::fmt::{self, Debug, Formatter};
 use lazy_static::lazy_static;
-use log::{debug, info};
+use log::trace;
 use crate::config::MEMORY_END;
 use crate::mm::address::{PhysAddr, PhysPageNum};
 use crate::sync::UPSafeCell;
+use crate::vars::*;
 
 trait FrameAllocator {
   fn new() -> Self;
@@ -132,15 +133,15 @@ pub fn frame_allocator_test() {
   let mut v: Vec<FrameTracker> = Vec::new();
   for i in 0..5 {
     let frame = frame_alloc().unwrap();
-    debug!("{:?}", frame);
+    trace!("{:?}", frame);
     v.push(frame);
   }
   v.clear();
   for i in 0..5 {
     let frame = frame_alloc().unwrap();
-    debug!("{:?}", frame);
+    trace!("{:?}", frame);
     v.push(frame);
   }
   drop(v);
-  debug!("frame_allocator_test passed!");
+  trace!("frame_allocator_test passed!");
 }

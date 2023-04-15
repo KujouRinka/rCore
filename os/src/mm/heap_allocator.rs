@@ -1,5 +1,5 @@
 use buddy_system_allocator::LockedHeap;
-use log::debug;
+use log::trace;
 use crate::config::KERNEL_HEAP_SIZE;
 use crate::vars::{ebss, sbss};
 
@@ -39,5 +39,5 @@ pub fn heap_test() {
   }
   assert!(bss_range.contains(&(v.as_ptr() as usize)));
   drop(v);
-  debug!("heap_test passed!");
+  trace!("heap_test passed!");
 }
