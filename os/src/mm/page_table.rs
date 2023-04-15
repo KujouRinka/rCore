@@ -1,7 +1,6 @@
 use alloc::collections::BTreeSet;
-use alloc::vec;
-use alloc::vec::Vec;
-use core::mem;
+// use alloc::vec;
+// use alloc::vec::Vec;
 use bitflags::*;
 use crate::config::PTE_FLAGS_BITS;
 use crate::mm::address::{PhysPageNum, VirtPageNum};
@@ -53,7 +52,7 @@ impl PageTableEntry {
     (self.flags() & PTEFlags::R) != PTEFlags::empty()
   }
 
-  pub fn is_writeable(&self) -> bool {
+  pub fn is_writable(&self) -> bool {
     (self.flags() & PTEFlags::W) != PTEFlags::empty()
   }
 
@@ -84,6 +83,10 @@ impl PageTable {
       // frames: Vec::new(),
       frames: BTreeSet::new(),
     }
+  }
+
+  pub fn token(&self) -> usize {
+    8usize << 60 | self.root_ppn.0
   }
 
   pub fn translate(&self, vpn: VirtPageNum) -> Option<PageTableEntry> {

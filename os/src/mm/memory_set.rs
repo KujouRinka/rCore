@@ -1,12 +1,22 @@
-use alloc::collections::BTreeMap;
+// use alloc::collections::BTreeMap;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
+use core::arch::asm;
 use core::ptr;
-use log::debug;
+use lazy_static::lazy_static;
+use log::{debug, trace};
+use riscv::register::satp;
 use crate::config::*;
 use crate::mm::address::{PhysPageNum, VirtAddr, VirtPageNum, VPNRange};
-use crate::mm::frame_allocator::{frame_alloc, FrameTracker};
+use crate::mm::frame_allocator::frame_alloc;
 use crate::mm::page_table::{PageTable, PTEFlags};
+use crate::sync::UPSafeCell;
 use crate::vars::*;
+
+lazy_static! {
+  pub static ref KERNEL_SPACE: Arc<UPSafeCell<MemorySet>> =
+    Arc::new(unsafe { UPSafeCell::new(MemorySet::new_kernel()) });
+}
 
 pub struct MemorySet {
   page_table: PageTable,
@@ -173,6 +183,14 @@ impl MemorySet {
     ), None);
   }
 
+  pub fn activate(&self) {
+    let satp = self.page_table.token();
+    unsafe {
+      satp::write(satp);
+      asm!("sfence.vma");
+    }
+  }
+
   /// Insert [`MapArea`] to current address space.
   fn push(&mut self, mut map_area: MapArea, data: Option<&[u8]>) {
     map_area.map(&mut self.page_table);
@@ -284,4 +302,25 @@ impl MapArea {
       }
     }
   }
+}
+
+#[allow(unused)]
+pub fn remap_test() {
+  let mut kernel_space = KERNEL_SPACE.exclusive_access();
+  let mid_text: VirtAddr = ((stext as usize + etext as usize) / 2).into();
+  let mid_rodata: VirtAddr = ((srodata as usize + erodata as usize) / 2).into();
+  let mid_data: VirtAddr = ((sdata as usize + edata as usize) / 2).into();
+  assert_eq!(
+    kernel_space.page_table.translate(mid_text.floor()).unwrap().is_writable(),
+    false
+  );
+  assert_eq!(
+    kernel_space.page_table.translate(mid_rodata.floor()).unwrap().is_writable(),
+    false,
+  );
+  assert_eq!(
+    kernel_space.page_table.translate(mid_data.floor()).unwrap().is_executable(),
+    false,
+  );
+  trace!("remap_test passed!");
 }
