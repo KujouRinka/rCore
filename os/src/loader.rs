@@ -1,5 +1,3 @@
-use crate::config::*;
-
 pub fn get_num_app() -> usize {
   extern "C" {
     fn _num_app();

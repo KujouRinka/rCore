@@ -39,8 +39,8 @@ pub fn clear_bss() {
 #[no_mangle]
 pub fn rust_main() -> ! {
   clear_bss();
+  logging::init(LevelFilter::Trace.into());
   mm::init();
-  logging::init(LevelFilter::Debug.into());
   mm::test();
   println!("hello world");
   trace!(
@@ -62,7 +62,6 @@ pub fn rust_main() -> ! {
     );
   error!("[kernel] .bss [{:#x}, {:#x})", sbss as usize, ebss as usize);
   trap::init();
-  loader::load_apps();
   trap::enable_timer_interrupt();
   timer::set_next_trigger();
   task::run_first_task();

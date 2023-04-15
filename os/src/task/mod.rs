@@ -3,7 +3,7 @@ use log::warn;
 use crate::config::MAX_APP_NUM;
 use crate::sync::UPSafeCell;
 use crate::task::task::{TaskControlBlock, TaskStatus};
-use crate::loader::{get_num_app, init_app_cx};
+use crate::loader::get_num_app;
 use crate::sbi::shutdown;
 use crate::task::context::TaskContext;
 use switch::__switch;
@@ -90,7 +90,7 @@ lazy_static! {
       MAX_APP_NUM
     ];
     for i in 0..num_app {
-      tasks[i].task_cx = TaskContext::goto_restore(init_app_cx(i));
+      // tasks[i].task_cx = TaskContext::goto_restore(init_app_cx(i));
       tasks[i].task_status = TaskStatus::Ready;
     }
     TaskManager {

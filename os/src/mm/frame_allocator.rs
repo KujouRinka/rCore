@@ -87,6 +87,7 @@ impl FrameTrackerMarker {
     Self { ppn }
   }
 
+  /// Generate a key for Map/Set to delete without drop.
   pub fn frame_tracker_ref(&self) -> &'static FrameTracker {
     unsafe { &*(self as *const Self as *const FrameTracker) }
   }
@@ -116,7 +117,7 @@ pub fn frame_alloc() -> Option<FrameTracker> {
   FRAME_ALLOCATOR
     .exclusive_access()
     .alloc()
-    .map(|ppn| FrameTracker::new(ppn))
+    .map(FrameTracker::new)
 }
 
 pub fn frame_dealloc(ppn: PhysPageNum) {
