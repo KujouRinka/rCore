@@ -103,7 +103,7 @@ impl MemorySet {
     // map elf file at low address
     let elf_header = elf.header;
     let magic = elf_header.pt1.magic;
-    assert!(magic, [0x7f, 0x45, 0x4c, 0x46], "invalid elf!");
+    assert_eq!(magic, [0x7f, 0x45, 0x4c, 0x46], "invalid elf!");
     let ph_count = elf_header.pt2.ph_count();
     let mut max_end_vpn = VirtPageNum(0);
     for i in 0..ph_count {
@@ -113,9 +113,9 @@ impl MemorySet {
         let end_va: VirtAddr = ((ph.virtual_addr() + ph.mem_size()) as usize).into();
         let mut map_perm = MapPermission::U;
         let ph_flags = ph.flags();
-        if ph_flags.is_read() { map_perm | MapPermission::R; }
-        if ph_flags.is_write() { map_perm | MapPermission::W; }
-        if ph_flags.is_execute() { map_perm | MapPermission::X; }
+        if ph_flags.is_read() { map_perm |= MapPermission::R; }
+        if ph_flags.is_write() { map_perm |= MapPermission::W; }
+        if ph_flags.is_execute() { map_perm |= MapPermission::X; }
         let map_area = MapArea::new(start_va, end_va, MapType::Framed, map_perm);
         max_end_vpn = map_area.vpn_range.get_end();
         memory_set.push(
