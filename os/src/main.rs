@@ -24,7 +24,7 @@ mod mm;
 mod vars;
 
 use core::arch::global_asm;
-use log::{debug, error, info, LevelFilter, trace, warn};
+use log::{info, LevelFilter};
 use vars::*;
 
 global_asm!(include_str!("entry.asm"));
@@ -39,16 +39,18 @@ pub fn clear_bss() {
 #[no_mangle]
 pub fn rust_main() -> ! {
   clear_bss();
+  info!("bss cleaned");
   logging::init(LevelFilter::Trace.into());
   mm::init();
+  info!("mm inited");
   mm::test();
   println!("hello world");
-  trace!(
+  info!(
         "[kernel] .text [{:#x}, {:#x})",
         stext as usize,
         etext as usize
     );
-  debug!(
+  info!(
         "[kernel] .rodata [{:#x}, {:#x})",
         srodata as usize, erodata as usize
     );
@@ -56,14 +58,17 @@ pub fn rust_main() -> ! {
         "[kernel] .data [{:#x}, {:#x})",
         sdata as usize, edata as usize
     );
-  warn!(
+  info!(
         "[kernel] boot_stack top=bottom={:#x}, lower_bound={:#x}",
         boot_stack_top as usize, boot_stack_lower_bound as usize
     );
-  error!("[kernel] .bss [{:#x}, {:#x})", sbss as usize, ebss as usize);
+  info!("[kernel] .bss [{:#x}, {:#x})", sbss as usize, ebss as usize);
   trap::init();
+  info!("trap inited");
   trap::enable_timer_interrupt();
+  info!("timer interrupt opened");
   timer::set_next_trigger();
+  info!("starting to run first task");
   task::run_first_task();
   panic!("Unreachable in rust_main")
 }

@@ -160,14 +160,12 @@ impl MemorySet {
   }
 
   fn map_trampoline(&mut self) {
-    debug!("mapping trampoline");
     self.page_table.map(
       VirtAddr::from(TRAMPOLINE).into(),
       PhysAddr::from(strampoline as usize).into(),
       PTEFlags::R | PTEFlags::X,
       None,
     );
-    debug!("trampoline mapped");
   }
 }
 
@@ -259,6 +257,7 @@ impl MapArea {
     }
   }
 
+  #[allow(unused)]
   /// Unmap `self.vpn_range` to specified [`PageTable`].
   pub fn unmap(&mut self, page_table: &mut PageTable) {
     for vpn in self.vpn_range {
@@ -266,6 +265,7 @@ impl MapArea {
     }
   }
 
+  #[allow(unused)]
   pub fn map_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) {
     let (ppn, frame_tracker) = match self.map_type {
       MapType::Identical => {

@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 use lazy_static::lazy_static;
-use log::{debug, trace, warn};
+use log::{trace, info};
 use crate::sync::UPSafeCell;
 use crate::task::task::{TaskControlBlock, TaskStatus};
 use crate::loader::{get_app_data, get_num_app};
@@ -61,7 +61,7 @@ impl TaskManager {
         __switch(current_task_cx_ptr, next_task_cx_ptr);
       }
     } else {
-      warn!("All applications completed!");
+      info!("All applications completed!");
       shutdown()
     }
   }
@@ -100,7 +100,7 @@ lazy_static! {
   pub static ref TASK_MANAGER: TaskManager = {
     trace!("init TASK_MANAGER");
     let num_app = get_num_app();
-    debug!("num_app = {}", num_app);
+    trace!("num_app = {}", num_app);
     let mut tasks = Vec::with_capacity(num_app);
     for i in 0..num_app {
       tasks.push(TaskControlBlock::new(

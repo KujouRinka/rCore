@@ -1,4 +1,4 @@
-use crate::println;
+use log::info;
 use crate::task::{
   suspend_current_and_run_next,
   exit_current_and_run_next,
@@ -7,7 +7,7 @@ use crate::task::{
 use crate::timer::get_time_ms;
 
 pub fn sys_exit(xstate: i32) -> ! {
-  println!("[kernel] Application exited with code {}", xstate);
+  info!("[kernel] Application {} exited with code {}", get_current_task_id(), xstate);
   exit_current_and_run_next()
 }
 
