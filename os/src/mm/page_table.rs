@@ -1,8 +1,10 @@
 use alloc::collections::BTreeSet;
+use alloc::vec::Vec;
 use bitflags::*;
-use crate::config::PTE_FLAGS_BITS;
+use crate::config::{PAGE_SIZE, PTE_FLAGS_BITS};
 use crate::mm::address::{PhysPageNum, VirtPageNum};
 use crate::mm::frame_allocator::{frame_alloc, FrameTracker, FrameTrackerMarker};
+use crate::mm::VirtAddr;
 
 bitflags! {
   pub struct PTEFlags: u8 {
@@ -154,4 +156,24 @@ impl PageTable {
   pub fn find_ppn(&self, vpn: VirtPageNum) -> Option<PhysPageNum> {
     self.find_pte(vpn).map(|pte| pte.ppn())
   }
+}
+
+pub fn translated_byte_buffer(
+  page_table_token: usize,
+  va_ptr: *const u8,
+  len: usize,
+) -> Vec<&'static [u8]> {
+  let page_table = PageTable::from_token(page_table_token);
+  let mut len_to_find = len;
+  let mut cur_va = va_ptr as usize;
+  let mut ret = Vec::with_capacity(len / PAGE_SIZE + 1);
+  while len_to_find > 0 {
+    let va = VirtAddr::from(cur_va);
+    let ppn = page_table.find_ppn(va.floor()).unwrap();
+    let cur_len = PAGE_SIZE.min(len_to_find.min(PAGE_SIZE - va.page_offset()));
+    ret.push(&ppn.get_bytes_array()[va.page_offset()..va.page_offset() + cur_len]);
+    len_to_find -= cur_len;
+    cur_va += cur_len;
+  }
+  ret
 }
