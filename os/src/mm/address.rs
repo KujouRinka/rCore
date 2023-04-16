@@ -1,4 +1,5 @@
 use core::fmt::{self, Debug, Formatter};
+use core::mem::size_of;
 use crate::config::{PAGE_SIZE, PAGE_SIZE_BITS};
 use crate::mm::page_table::PageTableEntry;
 
@@ -161,12 +162,12 @@ impl From<VirtPageNum> for VirtAddr {
 impl PhysPageNum {
   pub fn get_pte_array(&self) -> &'static mut [PageTableEntry] {
     let pa: PhysAddr = self.clone().into();
-    unsafe { core::slice::from_raw_parts_mut(pa.0 as *mut _, 512) }
+    unsafe { core::slice::from_raw_parts_mut(pa.0 as *mut _, PAGE_SIZE / size_of::<usize>()) }
   }
 
   pub fn get_bytes_array(&self) -> &'static mut [u8] {
     let pa: PhysAddr = self.clone().into();
-    unsafe { core::slice::from_raw_parts_mut(pa.0 as *mut _, 1024) }
+    unsafe { core::slice::from_raw_parts_mut(pa.0 as *mut _, PAGE_SIZE) }
   }
 
   pub fn get_mut<T>(&self) -> &'static mut T {
