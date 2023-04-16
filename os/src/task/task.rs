@@ -1,6 +1,6 @@
 use core::ptr;
 use crate::config::*;
-use crate::mm::{KERNEL_SPACE, MapPermission, MemorySet, PhysPageNum};
+use crate::mm::{KERNEL_SPACE, MapPermission, MemorySet, PhysPageNum, VirtAddr};
 use crate::task::context::TaskContext;
 use crate::trap::context::TrapContext;
 use crate::trap::trap_handler;
@@ -26,7 +26,7 @@ impl TaskControlBlock {
   pub fn new(elf_data: &[u8], app_id: usize) -> Self {
     let (memory_set, user_stack_top, entry_point) = MemorySet::from_elf(elf_data);
     let trap_cx_ppn = memory_set
-      .translate(TRAP_CONTEXT.into())
+      .translate(VirtAddr::from(TRAP_CONTEXT).into())
       .unwrap()
       .ppn();
     let (kernel_bottom, kernel_top) = kernel_stack_position(app_id);
