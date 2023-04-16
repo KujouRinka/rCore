@@ -9,6 +9,7 @@ use crate::config::*;
 use crate::mm::address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum, VPNRange};
 use crate::mm::frame_allocator::frame_alloc;
 use crate::mm::page_table::{PageTable, PTEFlags};
+use crate::mm::PageTableEntry;
 use crate::sync::UPSafeCell;
 use crate::vars::*;
 
@@ -194,6 +195,14 @@ impl MemorySet {
       satp::write(satp);
       asm!("sfence.vma");
     }
+  }
+
+  pub fn token(&self) -> usize {
+    self.page_table.token()
+  }
+
+  pub fn translate(&self, vpn: VirtPageNum) -> Option<PageTableEntry> {
+    self.page_table.translate(vpn)
   }
 
   /// Insert [`MapArea`] to current address space.
