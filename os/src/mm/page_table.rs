@@ -125,16 +125,13 @@ impl PageTable {
     let mut ret = None;
     for (i, idx) in index.into_iter().enumerate() {
       let next_pte = &mut ppn.get_pte_array()[idx];
-      if i == 2 {
-        ret = Some(next_pte);
-        break;
-      }
-      if !next_pte.is_valid() {
+      if !next_pte.is_valid() && i != 2 {
         let new_frame = frame_alloc().unwrap();
         *next_pte = PageTableEntry::new(new_frame.ppn, PTEFlags::V);
         self.frames_holder.insert(new_frame);
       }
       ppn = next_pte.ppn();
+      ret = Some(next_pte);
     }
     ret
   }
@@ -143,9 +140,9 @@ impl PageTable {
     let index = vpn.indexes();
     let mut ppn = self.root_ppn.clone();
     let mut ret = None;
-    for idx in index.into_iter() {
+    for (i, idx) in index.into_iter().enumerate() {
       let next_pte = &mut ppn.get_pte_array()[idx];
-      if !next_pte.is_valid() {
+      if !next_pte.is_valid() && i != 2 {
         return None;
       }
       ppn = next_pte.ppn();

@@ -323,5 +323,23 @@ pub fn remap_test() {
     kernel_space.page_table.translate(mid_data.floor()).unwrap().is_executable(),
     false,
   );
+  // unmap test
+  let (bottom, top): (VirtAddr, VirtAddr) =
+    ((TRAP_CONTEXT - PAGE_SIZE).into(), TRAP_CONTEXT.into());
+  kernel_space.push(MapArea::new(
+    bottom,
+    top,
+    MapType::Framed,
+    MapPermission::R,
+  ), None);
+  assert_eq!(
+    kernel_space.page_table.translate(bottom.into()).unwrap().is_readable(),
+    true,
+  );
+  kernel_space.page_table.unmap(bottom.into(), true);
+  assert_eq!(
+    kernel_space.page_table.translate(bottom.into()).unwrap().is_readable(),
+    false,
+  );
   trace!("remap_test passed!");
 }
