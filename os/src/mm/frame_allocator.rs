@@ -89,7 +89,7 @@ impl FrameTrackerMarker {
 
   /// Generate a key for Map/Set to delete without drop.
   pub fn frame_tracker_ref(&self) -> &'static FrameTracker {
-    unsafe { &*(self as *const Self as *const FrameTracker) }
+    unsafe { core::mem::transmute(self) }
   }
 }
 

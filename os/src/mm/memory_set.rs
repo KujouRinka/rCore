@@ -1,5 +1,5 @@
 use alloc::sync::Arc;
-use alloc::vec::Vec;
+// use alloc::vec::Vec;
 use core::arch::asm;
 use core::ptr;
 use lazy_static::lazy_static;
@@ -20,15 +20,11 @@ lazy_static! {
 
 pub struct MemorySet {
   page_table: PageTable,
-  areas: Vec<MapArea>,
 }
 
 impl MemorySet {
   pub fn new_bare() -> Self {
-    Self {
-      page_table: PageTable::new(),
-      areas: Vec::new(),
-    }
+    Self { page_table: PageTable::new() }
   }
 
   /// Map new kernel without kernel stack.
@@ -209,7 +205,6 @@ impl MemorySet {
     if let Some(data) = data {
       map_area.copy_data(&mut self.page_table, data);
     }
-    self.areas.push(map_area);
   }
 }
 
