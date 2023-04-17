@@ -113,7 +113,8 @@ impl PageTable {
     *pte = PageTableEntry::empty();
     if dealloc {
       // TODO: release record in self.frames
-      let key_to_remove = FrameTrackerMarker::new(pte.ppn()).frame_tracker_ref();
+      let dummy_key = FrameTrackerMarker::new(pte.ppn());
+      let key_to_remove = dummy_key.frame_tracker_ref();
       self.frames_holder.remove(&key_to_remove);
     }
   }

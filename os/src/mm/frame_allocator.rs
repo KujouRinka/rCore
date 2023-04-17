@@ -1,5 +1,6 @@
 use alloc::vec::Vec;
 use core::fmt::{self, Debug, Formatter};
+use core::marker::PhantomData;
 use lazy_static::lazy_static;
 use log::trace;
 use crate::config::MEMORY_END;
@@ -74,21 +75,24 @@ pub fn init_frame_allocator() {
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
+#[repr(C)]
 pub struct FrameTracker {
   pub ppn: PhysPageNum,
 }
 
-pub struct FrameTrackerMarker {
+#[repr(C)]
+pub struct FrameTrackerMarker<'a> {
   pub ppn: PhysPageNum,
+  _marker: PhantomData<&'a PhysPageNum>,
 }
 
-impl FrameTrackerMarker {
+impl<'a> FrameTrackerMarker<'a> {
   pub fn new(ppn: PhysPageNum) -> Self {
-    Self { ppn }
+    Self { ppn, _marker: PhantomData }
   }
 
   /// Generate a key for Map/Set to delete without drop.
-  pub fn frame_tracker_ref(&self) -> &'static FrameTracker {
+  pub fn frame_tracker_ref(&self) -> &'_ FrameTracker {
     unsafe { core::mem::transmute(self) }
   }
 }
