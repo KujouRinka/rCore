@@ -61,6 +61,5 @@ __restore:
         LOAD_GP %n
         .set n, n+1
     .endr
-    # MAY REMOVE THIS INSTRUCTION
     ld sp, 2*8(sp)
     sret

@@ -39,8 +39,8 @@ pub fn clear_bss() {
 #[no_mangle]
 pub fn rust_main() -> ! {
   clear_bss();
-  info!("bss cleaned");
   logging::init(LevelFilter::Trace.into());
+  info!("bss cleaned");
   mm::init();
   info!("mm inited");
   mm::test();
