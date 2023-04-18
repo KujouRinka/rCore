@@ -73,6 +73,12 @@ impl TaskManager {
       .map(|id| id % self.num_app)
       .find(|id| inner.tasks[*id].task_status == TaskStatus::Ready)
   }
+
+  fn change_current_program_brk(&self, size: i32) -> Option<usize> {
+    let inner = self.inner.exclusive_access();
+    let current = inner.current_task;
+    inner.tasks[current].change_brk(size)
+  }
 }
 
 impl TaskManager {
@@ -159,4 +165,8 @@ pub fn get_current_token() -> usize {
 
 pub fn get_current_trap_cx() -> &'static mut TrapContext {
   TASK_MANAGER.get_current_trap_cx()
+}
+
+pub fn change_program_brk(size: i32) -> Option<usize> {
+  TASK_MANAGER.change_current_program_brk(size)
 }

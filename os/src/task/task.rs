@@ -19,12 +19,13 @@ pub struct TaskControlBlock {
   // Used for mm
   pub memory_set: MemorySet,
   pub trap_cx_ppn: PhysPageNum,
-  pub base_size: usize,
+  pub heap_bottom: usize,
+  pub program_brk: usize,
 }
 
 impl TaskControlBlock {
   pub fn new(elf_data: &[u8], app_id: usize) -> Self {
-    let (memory_set, user_stack_top, entry_point) = MemorySet::from_elf(elf_data);
+    let (memory_set, user_stack_top, heap_bottom, entry_point) = MemorySet::from_elf(elf_data);
     let trap_cx_ppn = memory_set
       .translate(VirtAddr::from(TRAP_CONTEXT).into())
       .unwrap()
@@ -43,7 +44,8 @@ impl TaskControlBlock {
       task_cx: TaskContext::goto_trap_return(kernel_top),
       memory_set,
       trap_cx_ppn,
-      base_size: user_stack_top,
+      heap_bottom,
+      program_brk: heap_bottom,
     };
     let trap_cx = tcb.get_trap_cx();
     let to_write_cx = TrapContext::app_init_context(
@@ -57,6 +59,17 @@ impl TaskControlBlock {
       ptr::write_volatile(trap_cx, to_write_cx);
     }
     tcb
+  }
+
+  pub fn change_brk(&self, size: i32) -> Option<usize> {
+    let old_brk = self.program_brk;
+    let new_brk = self.program_brk as isize + size as isize;
+    if new_brk < self.heap_bottom as isize {
+      return None;
+    } else {
+      // TODO: do sbrk jobs.
+      Some(old_brk)
+    }
   }
 }
 

@@ -116,7 +116,7 @@ impl MemorySet {
   /// |       ...         |
   /// +-------------------+
   /// |    Heap Memory    |
-  /// +-------------------+
+  /// +-------------------+  <- heap_bottom
   /// |      .bss         |
   /// +-------------------+
   /// |      .data        |
@@ -125,7 +125,7 @@ impl MemorySet {
   /// +-------------------+
   /// |      .text        |
   /// +-------------------+  <- BASE_ADDRESS (0x10000 va)
-  pub fn from_elf(elf_data: &[u8]) -> (Self, usize, usize) {
+  pub fn from_elf(elf_data: &[u8]) -> (Self, usize, usize, usize) {
     let mut memory_set = Self::new_bare();
     memory_set.map_trampoline();
     let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
@@ -155,8 +155,9 @@ impl MemorySet {
       }
     }
 
+    let heap_bottom = VirtAddr::from(max_end_vpn).into();
     let user_stack_top = TRAP_CONTEXT;
-    let user_stack_bottom = user_stack_top - PAGE_SIZE;
+    let user_stack_bottom = user_stack_top - USER_STACK_SIZE;
 
     // map user stack
     memory_set.push(MapArea::new(
@@ -173,7 +174,12 @@ impl MemorySet {
       MapType::Framed,
       MapPermission::R | MapPermission::W,
     ), None);
-    (memory_set, user_stack_top, elf.header.pt2.entry_point() as usize)
+    (
+      memory_set,
+      user_stack_top,
+      heap_bottom,
+      elf.header.pt2.entry_point() as usize
+    )
   }
 
   fn map_trampoline(&mut self) {

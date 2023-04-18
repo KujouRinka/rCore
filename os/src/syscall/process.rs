@@ -3,6 +3,7 @@ use crate::task::{
   suspend_current_and_run_next,
   exit_current_and_run_next,
   get_current_task_id,
+  change_program_brk,
 };
 use crate::timer::get_time_ms;
 
@@ -25,5 +26,9 @@ pub fn sys_get_time() -> isize {
 }
 
 pub fn sys_sbrk(size: i32) -> isize {
-  todo!()
+  if let Some(old_brk) = change_program_brk(size) {
+    return old_brk as isize
+  } else {
+    -1
+  }
 }
