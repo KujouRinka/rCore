@@ -100,6 +100,31 @@ impl MemorySet {
   }
 
   /// Make [`MemorySet`] from elf file, with `user_stack_top` and `entry_point` return.
+  /// # ELF Layout:
+  /// ```
+  /// High 256GB
+  /// +-------------------+
+  /// |  Trampoline Code  |
+  /// +-------------------+  <- TRAMPOLINE
+  /// |    TrapContext    |
+  /// +-------------------+  <- TRAP_CONTEXT, user_stack_top
+  /// |    User Stack     |
+  /// +-------------------+  <- user_stack_bottom
+  /// |       ...         |
+  ///
+  /// Low 256GB
+  /// |       ...         |
+  /// +-------------------+
+  /// |    Heap Memory    |
+  /// +-------------------+
+  /// |      .bss         |
+  /// +-------------------+
+  /// |      .data        |
+  /// +-------------------+
+  /// |      .rodata      |
+  /// +-------------------+
+  /// |      .text        |
+  /// +-------------------+  <- BASE_ADDRESS (0x10000 va)
   pub fn from_elf(elf_data: &[u8]) -> (Self, usize, usize) {
     let mut memory_set = Self::new_bare();
     memory_set.map_trampoline();
@@ -122,7 +147,7 @@ impl MemorySet {
         if ph_flags.is_write() { map_perm |= MapPermission::W; }
         if ph_flags.is_execute() { map_perm |= MapPermission::X; }
         let map_area = MapArea::new(start_va, end_va, MapType::Framed, map_perm);
-        max_end_vpn = map_area.vpn_range.get_end();
+        max_end_vpn = max_end_vpn.max(map_area.vpn_range.get_end());
         memory_set.push(
           map_area,
           Some(&elf.input[ph.offset() as usize..(ph.offset() + ph.file_size()) as usize]),
@@ -130,12 +155,8 @@ impl MemorySet {
       }
     }
 
-    let max_end_va: VirtAddr = max_end_vpn.into();
-    let mut user_stack_bottom: usize = max_end_va.into();
-    user_stack_bottom += PAGE_SIZE;
-    let user_stack_top = user_stack_bottom + USER_STACK_SIZE;
-    // `max_end_va` --- guard page --- `user_stack_bottom` --- user stack --- `user_stack_top`
-    //  low address <----- high address
+    let user_stack_top = TRAP_CONTEXT;
+    let user_stack_bottom = user_stack_top - PAGE_SIZE;
 
     // map user stack
     memory_set.push(MapArea::new(
