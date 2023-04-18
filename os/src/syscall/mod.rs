@@ -10,6 +10,7 @@ const SYSCALL_WRITE: usize = 64;
 const SYSCALL_EXIT: usize = 93;
 const SYSCALL_YIELD: usize = 124;
 const SYSCALL_GET_TIME: usize = 169;
+const SYSCALL_SBRK: usize = 214;
 const SYSCALL_GET_TASKINFO: usize = 114514;
 
 // TODO: performance: may replace with a syscall table
@@ -21,6 +22,7 @@ pub fn syscall(which: usize, args: [usize; 3]) -> isize {
     SYSCALL_EXIT => sys_exit(args[0] as i32),
     SYSCALL_YIELD => sys_yield(),
     SYSCALL_GET_TIME => sys_get_time(),
+    SYSCALL_SBRK => sys_sbrk(args[0] as i32),
     SYSCALL_GET_TASKINFO => sys_get_taskinfo(),
     _ => {
       error!("Unsupported syscall: {}", which);

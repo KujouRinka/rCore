@@ -23,3 +23,7 @@ pub fn sys_yield() -> isize {
 pub fn sys_get_time() -> isize {
   get_time_ms() as isize
 }
+
+pub fn sys_sbrk(size: i32) -> isize {
+  todo!()
+}
