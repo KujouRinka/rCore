@@ -27,10 +27,10 @@ fn main() -> i32 {
         new_page[pos] = 1;
     }
     println!("write ok");
-    sbrk(PAGE_SIZE as i32 * 10);
+    sbrk(PAGE_SIZE as i32 * 1000);
     let brk = sbrk(0);
     println!("10 page allocated,  break point = {:x}", brk);
-    sbrk(PAGE_SIZE as i32 * -11);
+    sbrk(PAGE_SIZE as i32 * -1001);
     let brk = sbrk(0);
     println!("11 page DEALLOCATED,  break point = {:x}", brk);
     println!("try DEALLOCATED more one page, should be failed.");

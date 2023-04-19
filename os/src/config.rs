@@ -13,8 +13,8 @@ pub const PTE_FLAGS_BITS: usize = 0xa;
 pub const TRAMPOLINE: usize = usize::MAX - PAGE_SIZE + 1;
 pub const TRAP_CONTEXT: usize = TRAMPOLINE - PAGE_SIZE;
 
-// pub const MEMORY_END: usize = 0x88000000;  // 128M
-pub const MEMORY_END: usize = 0x80800000;     // 8M
+pub const MEMORY_END: usize = 0x88000000;  // 128M
+// pub const MEMORY_END: usize = 0x80800000;     // 8M
 
 /// # Layout
 /// ```
