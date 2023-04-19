@@ -13,11 +13,14 @@ use riscv::register::{
 };
 use riscv::register::scause::Interrupt;
 use crate::config::*;
+use crate::mm::VirtAddr;
 use crate::syscall::syscall;
 use crate::task::{
   exit_current_and_run_next,
+  get_current_tcb_ref,
   get_current_token,
   get_current_trap_cx,
+  lazy_alloc_page,
   suspend_current_and_run_next,
 };
 use crate::timer::set_next_trigger;
@@ -67,9 +70,28 @@ pub fn trap_handler() -> ! {
       cx.regs[10] = syscall(cx.regs[17], [cx.regs[10], cx.regs[11], cx.regs[12]]) as usize;
     }
     Trap::Exception(Exception::StoreFault)
-    | Trap::Exception(Exception::StorePageFault) => {
-      warn!("[kernel] PageFault in application, kernel kill it.");
-      exit_current_and_run_next();
+    | Trap::Exception(Exception::StorePageFault)
+    | Trap::Exception(Exception::LoadFault)
+    | Trap::Exception(Exception::LoadPageFault) => {
+      let tcb = get_current_tcb_ref();
+      let ok = if stval >= tcb.heap_bottom && stval < tcb.program_brk {
+        warn!("{:?}: lazy trap triggered", scause.cause());
+        lazy_alloc_page(VirtAddr::from(stval).into())
+      } else {
+        match tcb.memory_set.translate(VirtAddr::from(stval).into()) {
+          Some(pte) if pte.is_valid() && pte.is_readable() && pte.is_cow_page() => {
+            // copy on write
+            true
+          }
+          _ => {
+            false
+          }
+        }
+      };
+      if !ok {
+        warn!("[kernel] PageFault in application, bad addr = {:#x}, bad instruction = {:#x}, kernel killed it.", stval, cx.sepc);
+        exit_current_and_run_next();
+      }
     }
     Trap::Exception(Exception::IllegalInstruction) => {
       warn!("[kernel] IllegalInstruction in application, kernel killed it.");

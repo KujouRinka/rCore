@@ -274,22 +274,27 @@ pub enum MapType {
 }
 
 bitflags! {
-  pub struct MapPermission: u8 {
+  pub struct MapPermission: u16 {
+    const V = 1 << 0;
     const R = 1 << 1;
     const W = 1 << 2;
     const X = 1 << 3;
     const U = 1 << 4;
+    const G = 1 << 5;
+    const A = 1 << 6;
+    const D = 1 << 7;
+    const C = 1 << 8;
   }
 }
 
-pub struct MapArea {
+struct MapArea {
   vpn_range: VPNRange,
   map_type: MapType,
   map_perm: MapPermission,
 }
 
 impl MapArea {
-  pub fn new(
+  fn new(
     start_va: VirtAddr,
     end_va: VirtAddr,
     map_type: MapType,
@@ -305,7 +310,7 @@ impl MapArea {
   }
 
   /// Map `self.vpn_range` to specified [`PageTable`].
-  pub fn map(&mut self, page_table: &mut PageTable) {
+  fn map(&mut self, page_table: &mut PageTable) {
     for vpn in self.vpn_range {
       self.map_one(page_table, vpn);
     }
@@ -313,13 +318,13 @@ impl MapArea {
 
   #[allow(unused)]
   /// Unmap `self.vpn_range` to specified [`PageTable`].
-  pub fn unmap(&mut self, page_table: &mut PageTable) {
+  fn unmap(&mut self, page_table: &mut PageTable) {
     for vpn in self.vpn_range {
       self.unmap_one(page_table, vpn);
     }
   }
 
-  pub fn map_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) {
+  fn map_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) {
     let (ppn, frame_tracker) = match self.map_type {
       MapType::Identical => {
         // Identical map has no need for allocating
@@ -336,7 +341,7 @@ impl MapArea {
     page_table.map(vpn, ppn, pte_flags, frame_tracker);
   }
 
-  pub fn unmap_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) {
+  fn unmap_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) {
     let free = match self.map_type {
       MapType::Identical => false,
       MapType::Framed => true,
@@ -344,14 +349,14 @@ impl MapArea {
     page_table.unmap(vpn, free);
   }
 
-  pub fn shrink_to(&mut self, page_table: &mut PageTable, new_end: VirtPageNum) {
+  fn shrink_to(&mut self, page_table: &mut PageTable, new_end: VirtPageNum) {
     for vpn in VPNRange::new(new_end, self.vpn_range.get_end()) {
       self.unmap_one(page_table, vpn);
     }
     self.vpn_range = VPNRange::new(self.vpn_range.get_start(), new_end);
   }
 
-  pub fn append_to(&mut self, page_table: &mut PageTable, new_end: VirtPageNum) {
+  fn append_to(&mut self, page_table: &mut PageTable, new_end: VirtPageNum) {
     for vpn in VPNRange::new(self.vpn_range.get_end(), new_end) {
       self.map_one(page_table, vpn);
     }
@@ -359,7 +364,7 @@ impl MapArea {
   }
 
   /// Copy `data` to physical addr
-  pub fn copy_data(&mut self, page_table: &mut PageTable, data: &[u8]) {
+  fn copy_data(&mut self, page_table: &mut PageTable, data: &[u8]) {
     // assert_eq!(self.map_type, MapType::Framed);
     let mut start = 0usize;
     let mut len = data.len();

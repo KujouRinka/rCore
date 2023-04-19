@@ -7,7 +7,7 @@ use crate::mm::frame_allocator::{frame_alloc, FrameTracker, FrameTrackerMarker};
 use crate::mm::VirtAddr;
 
 bitflags! {
-  pub struct PTEFlags: u8 {
+  pub struct PTEFlags: u16 {
     const V = 1 << 0;
     const R = 1 << 1;
     const W = 1 << 2;
@@ -16,6 +16,7 @@ bitflags! {
     const G = 1 << 5;
     const A = 1 << 6;
     const D = 1 << 7;
+    const C = 1 << 8;
   }
 }
 
@@ -41,7 +42,7 @@ impl PageTableEntry {
   }
 
   pub fn flags(&self) -> PTEFlags {
-    PTEFlags::from_bits(self.bits as u8).unwrap()
+    PTEFlags::from_bits((self.bits & (1 << 10) - 1) as u16).unwrap()
   }
 
   pub fn is_valid(&self) -> bool {
@@ -58,6 +59,10 @@ impl PageTableEntry {
 
   pub fn is_executable(&self) -> bool {
     (self.flags() & PTEFlags::X) != PTEFlags::empty()
+  }
+
+  pub fn is_cow_page(&self) -> bool {
+    (self.flags() & PTEFlags::C) != PTEFlags::empty()
   }
 }
 

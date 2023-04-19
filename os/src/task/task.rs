@@ -1,6 +1,6 @@
 use core::ptr;
 use crate::config::*;
-use crate::mm::{KERNEL_SPACE, MapPermission, MemorySet, PhysPageNum, VirtAddr};
+use crate::mm::{KERNEL_SPACE, MapPermission, MemorySet, PhysPageNum, VirtAddr, VirtPageNum};
 use crate::task::context::TaskContext;
 use crate::trap::context::TrapContext;
 use crate::trap::trap_handler;
@@ -20,7 +20,7 @@ pub struct TaskControlBlock {
   pub memory_set: MemorySet,
   pub trap_cx_ppn: PhysPageNum,
   pub heap_bottom: usize,
-  pub program_brk: usize,
+  pub program_brk: usize,   // also heap_top
 }
 
 impl TaskControlBlock {
@@ -67,17 +67,30 @@ impl TaskControlBlock {
     if new_brk < self.heap_bottom as isize {
       return None;
     }
-    let result = if size < 0 {
-      self.memory_set.shrink_to(VirtAddr::from(self.heap_bottom), VirtAddr::from(new_brk as usize))
-    } else {
-      self.memory_set.append_to(VirtAddr::from(self.heap_bottom), VirtAddr::from(new_brk as usize))
-    };
+    // let result = if size < 0 {
+    //   self.memory_set.shrink_to(VirtAddr::from(self.heap_bottom), VirtAddr::from(new_brk as usize))
+    // } else {
+    //   self.memory_set.append_to(VirtAddr::from(self.heap_bottom), VirtAddr::from(new_brk as usize))
+    // };
+    // TODO: free pages possible when shrink.
+    let result = true;
     if result {
       self.program_brk = new_brk as usize;
       Some(old_brk)
     } else {
       None
     }
+  }
+
+  pub fn lazy_alloc_page(&mut self, vpn: VirtPageNum) -> bool {
+    unsafe {
+      self.memory_set.insert_framed_area(
+        vpn.into(),
+        (VirtAddr::from(vpn).0 + 1).into(),
+        MapPermission::R | MapPermission::W | MapPermission::U,
+      );
+    }
+    true
   }
 }
 

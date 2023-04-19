@@ -7,6 +7,7 @@ use crate::loader::{get_app_data, get_num_app};
 use crate::sbi::shutdown;
 use crate::task::context::TaskContext;
 use switch::__switch;
+use crate::mm::VirtPageNum;
 use crate::trap::context::TrapContext;
 
 mod switch;
@@ -78,6 +79,12 @@ impl TaskManager {
     let mut inner = self.inner.exclusive_access();
     let current = inner.current_task;
     inner.tasks[current].change_brk(size)
+  }
+
+  fn lazy_alloc_page(&self, vpn: VirtPageNum) -> bool {
+    let mut inner = self.inner.exclusive_access();
+    let current = inner.current_task;
+    inner.tasks[current].lazy_alloc_page(vpn)
   }
 }
 
@@ -167,6 +174,16 @@ pub fn get_current_trap_cx() -> &'static mut TrapContext {
   TASK_MANAGER.get_current_trap_cx()
 }
 
+pub fn get_current_tcb_ref() -> &'static TaskControlBlock {
+  let inner = TASK_MANAGER.inner.exclusive_access();
+  let current = inner.current_task;
+  unsafe { core::mem::transmute(&inner.tasks[current]) }
+}
+
 pub fn change_program_brk(size: i32) -> Option<usize> {
   TASK_MANAGER.change_current_program_brk(size)
+}
+
+pub fn lazy_alloc_page(vpn: VirtPageNum) -> bool {
+  TASK_MANAGER.lazy_alloc_page(vpn)
 }
