@@ -1,3 +1,4 @@
+use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 // use alloc::vec::Vec;
 use core::arch::asm;
@@ -20,11 +21,15 @@ lazy_static! {
 
 pub struct MemorySet {
   page_table: PageTable,
+  areas: BTreeMap<VirtPageNum, MapArea>,
 }
 
 impl MemorySet {
   pub fn new_bare() -> Self {
-    Self { page_table: PageTable::new() }
+    Self {
+      page_table: PageTable::new(),
+      areas: BTreeMap::new(),
+    }
   }
 
   /// Map new kernel without kernel stack.
@@ -155,7 +160,7 @@ impl MemorySet {
       }
     }
 
-    let heap_bottom = VirtAddr::from(max_end_vpn).into();
+    let heap_bottom: usize = VirtAddr::from(max_end_vpn).into();
     let user_stack_top = TRAP_CONTEXT;
     let user_stack_bottom = user_stack_top - USER_STACK_SIZE;
 
@@ -163,6 +168,14 @@ impl MemorySet {
     memory_set.push(MapArea::new(
       user_stack_bottom.into(),
       user_stack_top.into(),
+      MapType::Framed,
+      MapPermission::R | MapPermission::W | MapPermission::U,
+    ), None);
+
+    // map for sbrk
+    memory_set.push(MapArea::new(
+      heap_bottom.into(),
+      heap_bottom.into(),
       MapType::Framed,
       MapPermission::R | MapPermission::W | MapPermission::U,
     ), None);
@@ -226,12 +239,31 @@ impl MemorySet {
     self.page_table.translate(vpn)
   }
 
+  pub fn shrink_to(&mut self, start: VirtAddr, new_end: VirtAddr) -> bool {
+    if let Some(area) = self.areas.get_mut(&start.into()) {
+      area.shrink_to(&mut self.page_table, new_end.ceil());
+      true
+    } else {
+      false
+    }
+  }
+
+  pub fn append_to(&mut self, start: VirtAddr, new_end: VirtAddr) -> bool {
+    if let Some(area) = self.areas.get_mut(&start.into()) {
+      area.append_to(&mut self.page_table, new_end.ceil());
+      true
+    } else {
+      false
+    }
+  }
+
   /// Insert [`MapArea`] to current address space.
   fn push(&mut self, mut map_area: MapArea, data: Option<&[u8]>) {
     map_area.map(&mut self.page_table);
     if let Some(data) = data {
       map_area.copy_data(&mut self.page_table, data);
     }
+    self.areas.insert(map_area.vpn_range.get_start(), map_area);
   }
 }
 
@@ -287,7 +319,6 @@ impl MapArea {
     }
   }
 
-  #[allow(unused)]
   pub fn map_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) {
     let (ppn, frame_tracker) = match self.map_type {
       MapType::Identical => {
@@ -311,6 +342,20 @@ impl MapArea {
       MapType::Framed => true,
     };
     page_table.unmap(vpn, free);
+  }
+
+  pub fn shrink_to(&mut self, page_table: &mut PageTable, new_end: VirtPageNum) {
+    for vpn in VPNRange::new(new_end, self.vpn_range.get_end()) {
+      self.unmap_one(page_table, vpn);
+    }
+    self.vpn_range = VPNRange::new(self.vpn_range.get_start(), new_end);
+  }
+
+  pub fn append_to(&mut self, page_table: &mut PageTable, new_end: VirtPageNum) {
+    for vpn in VPNRange::new(self.vpn_range.get_end(), new_end) {
+      self.map_one(page_table, vpn);
+    }
+    self.vpn_range = VPNRange::new(self.vpn_range.get_start(), new_end);
   }
 
   /// Copy `data` to physical addr
