@@ -93,6 +93,7 @@ version = "0.1.0"
 dependencies = [
  "bitflags",
  "buddy_system_allocator",
+ "cfg-if",
  "lazy_static",
  "log",
  "riscv",

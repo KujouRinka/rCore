@@ -1,5 +1,6 @@
 #![feature(panic_info_message)]
 #![feature(alloc_error_handler)]
+#![feature(stmt_expr_attributes)]
 #![no_std]
 #![no_main]
 

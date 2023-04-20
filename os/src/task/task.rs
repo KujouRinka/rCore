@@ -1,6 +1,7 @@
 use core::ptr;
+use cfg_if::cfg_if;
 use crate::config::*;
-use crate::mm::{KERNEL_SPACE, MapPermission, MemorySet, PhysPageNum, VirtAddr, VirtPageNum};
+use crate::mm::{KERNEL_SPACE, MapPermission, MemorySet, PhysPageNum, VirtAddr};
 use crate::task::context::TaskContext;
 use crate::trap::context::TrapContext;
 use crate::trap::trap_handler;
@@ -67,14 +68,27 @@ impl TaskControlBlock {
     if new_brk < self.heap_bottom as isize {
       return None;
     }
-    // let result = if size < 0 {
-    //   self.memory_set.shrink_to(VirtAddr::from(self.heap_bottom), VirtAddr::from(new_brk as usize))
-    // } else {
-    //   self.memory_set.append_to(VirtAddr::from(self.heap_bottom), VirtAddr::from(new_brk as usize))
-    // };
-    // TODO: free pages possible when shrink.
-    let result = true;
-    if result {
+    let ok;
+    cfg_if! {
+      if #[cfg(feature = "sbrk_lazy_alloc")] {
+        // TODO: free pages possible when shrink.
+        ok = true;
+        if size < 0 {
+          self.memory_set
+            .remove_framed_area(
+              VirtAddr::from(new_brk as usize),
+              VirtAddr::from(self.program_brk),
+            );
+        }
+      } else {
+        ok = if size < 0 {
+          self.memory_set.shrink_to(VirtAddr::from(self.heap_bottom), VirtAddr::from(new_brk as usize))
+        } else {
+          self.memory_set.append_to(VirtAddr::from(self.heap_bottom), VirtAddr::from(new_brk as usize))
+        }
+      }
+    }
+    if ok {
       self.program_brk = new_brk as usize;
       Some(old_brk)
     } else {
@@ -82,11 +96,12 @@ impl TaskControlBlock {
     }
   }
 
-  pub fn lazy_alloc_page(&mut self, vpn: VirtPageNum) -> bool {
+  #[cfg(feature = "sbrk_lazy_alloc")]
+  pub fn lazy_alloc_page(&mut self, addr: VirtAddr) -> bool {
     unsafe {
       self.memory_set.insert_framed_area(
-        vpn.into(),
-        (VirtAddr::from(vpn).0 + 1).into(),
+        addr,
+        (addr.0 + 1).into(),
         MapPermission::R | MapPermission::W | MapPermission::U,
       );
     }

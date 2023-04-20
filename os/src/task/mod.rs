@@ -7,7 +7,8 @@ use crate::loader::{get_app_data, get_num_app};
 use crate::sbi::shutdown;
 use crate::task::context::TaskContext;
 use switch::__switch;
-use crate::mm::VirtPageNum;
+#[cfg(feature = "sbrk_lazy_alloc")]
+use crate::mm::VirtAddr;
 use crate::trap::context::TrapContext;
 
 mod switch;
@@ -81,10 +82,11 @@ impl TaskManager {
     inner.tasks[current].change_brk(size)
   }
 
-  fn lazy_alloc_page(&self, vpn: VirtPageNum) -> bool {
+  #[cfg(feature = "sbrk_lazy_alloc")]
+  fn lazy_alloc_page(&self, addr: VirtAddr) -> bool {
     let mut inner = self.inner.exclusive_access();
     let current = inner.current_task;
-    inner.tasks[current].lazy_alloc_page(vpn)
+    inner.tasks[current].lazy_alloc_page(addr)
   }
 }
 
@@ -184,6 +186,7 @@ pub fn change_program_brk(size: i32) -> Option<usize> {
   TASK_MANAGER.change_current_program_brk(size)
 }
 
-pub fn lazy_alloc_page(vpn: VirtPageNum) -> bool {
-  TASK_MANAGER.lazy_alloc_page(vpn)
+#[cfg(feature = "sbrk_lazy_alloc")]
+pub fn lazy_alloc_page(addr: VirtAddr) -> bool {
+  TASK_MANAGER.lazy_alloc_page(addr)
 }

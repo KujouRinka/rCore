@@ -20,9 +20,10 @@ use crate::task::{
   get_current_tcb_ref,
   get_current_token,
   get_current_trap_cx,
-  lazy_alloc_page,
   suspend_current_and_run_next,
 };
+#[cfg(feature = "sbrk_lazy_alloc")]
+use crate::task::lazy_alloc_page;
 use crate::timer::set_next_trigger;
 
 pub mod context;
@@ -75,8 +76,13 @@ pub fn trap_handler() -> ! {
     | Trap::Exception(Exception::LoadPageFault) => {
       let tcb = get_current_tcb_ref();
       let ok = if stval >= tcb.heap_bottom && stval < tcb.program_brk {
-        warn!("{:?}: lazy trap triggered", scause.cause());
-        lazy_alloc_page(VirtAddr::from(stval).into())
+        // lazy allocation for sbrk()
+        #[cfg(feature = "sbrk_lazy_alloc")] {
+          lazy_alloc_page(stval.into())
+        }
+        #[cfg(not(feature = "sbrk_lazy_alloc"))] {
+          false
+        }
       } else {
         match tcb.memory_set.translate(VirtAddr::from(stval).into()) {
           Some(pte) if pte.is_valid() && pte.is_readable() && pte.is_cow_page() => {

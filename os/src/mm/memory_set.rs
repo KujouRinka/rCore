@@ -9,7 +9,7 @@ use riscv::register::satp;
 use crate::config::*;
 use crate::mm::address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum, VPNRange};
 use crate::mm::frame_allocator::frame_alloc;
-use crate::mm::page_table::{PageTable, PTEFlags};
+use crate::mm::page_table::{MapArgs, PageTable, PTEFlags, UnmapArgs};
 use crate::mm::PageTableEntry;
 use crate::sync::UPSafeCell;
 use crate::vars::*;
@@ -197,10 +197,10 @@ impl MemorySet {
 
   fn map_trampoline(&mut self) {
     self.page_table.map(
-      VirtAddr::from(TRAMPOLINE).into(),
-      PhysAddr::from(strampoline as usize).into(),
-      PTEFlags::R | PTEFlags::X,
-      None,
+      MapArgs::builder(
+        VirtAddr::from(TRAMPOLINE).into(),
+        PhysAddr::from(strampoline as usize).into(),
+      ).with_flags(PTEFlags::R | PTEFlags::X),
     );
   }
 }
@@ -223,6 +223,21 @@ impl MemorySet {
     ), None);
   }
 
+  #[allow(unused)]
+  pub fn remove_framed_area(
+    &mut self,
+    start_va: VirtAddr,
+    end_va: VirtAddr,
+  ) {
+    for vpn in VPNRange::new(start_va.ceil(), end_va.floor()) {
+      self.page_table.unmap(
+        UnmapArgs::builder(vpn)
+          .with_dealloc(true)
+          .with_panic(false),
+      )
+    }
+  }
+
   pub fn activate(&self) {
     let satp = self.page_table.token();
     unsafe {
@@ -239,6 +254,7 @@ impl MemorySet {
     self.page_table.translate(vpn)
   }
 
+  #[allow(unused)]
   pub fn shrink_to(&mut self, start: VirtAddr, new_end: VirtAddr) -> bool {
     if let Some(area) = self.areas.get_mut(&start.into()) {
       area.shrink_to(&mut self.page_table, new_end.ceil());
@@ -248,6 +264,7 @@ impl MemorySet {
     }
   }
 
+  #[allow(unused)]
   pub fn append_to(&mut self, start: VirtAddr, new_end: VirtAddr) -> bool {
     if let Some(area) = self.areas.get_mut(&start.into()) {
       area.append_to(&mut self.page_table, new_end.ceil());
@@ -338,7 +355,11 @@ impl MapArea {
       }
     };
     let pte_flags = PTEFlags::from_bits(self.map_perm.bits).unwrap();
-    page_table.map(vpn, ppn, pte_flags, frame_tracker);
+    page_table.map(
+      MapArgs::builder(vpn, ppn)
+        .with_flags(pte_flags)
+        .with_frame(frame_tracker),
+    );
   }
 
   fn unmap_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) {
@@ -346,7 +367,11 @@ impl MapArea {
       MapType::Identical => false,
       MapType::Framed => true,
     };
-    page_table.unmap(vpn, free);
+    page_table.unmap(
+      UnmapArgs::builder(vpn)
+        .with_dealloc(free)
+        .with_panic(true),
+    );
   }
 
   fn shrink_to(&mut self, page_table: &mut PageTable, new_end: VirtPageNum) {
@@ -417,7 +442,11 @@ pub fn remap_test() {
     kernel_space.page_table.translate(bottom.into()).unwrap().is_readable(),
     true,
   );
-  kernel_space.page_table.unmap(bottom.into(), true);
+  kernel_space.page_table.unmap(
+    UnmapArgs::builder(bottom.into())
+      .with_dealloc(true)
+      .with_panic(true),
+  );
   assert_eq!(
     kernel_space.page_table.translate(bottom.into()).unwrap().is_readable(),
     false,
