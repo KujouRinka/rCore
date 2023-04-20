@@ -66,6 +66,78 @@ impl PageTableEntry {
   }
 }
 
+pub struct MapArgs {
+  vpn: VirtPageNum,
+  ppn: PhysPageNum,
+  flags: PTEFlags,
+  frame: Option<FrameTracker>,
+}
+
+pub struct UnmapArgs {
+  vpn: VirtPageNum,
+  dealloc: bool,
+  panic: bool,
+}
+
+impl MapArgs {
+  pub fn builder(vpn: VirtPageNum, ppn: PhysPageNum) -> Self {
+    Self {
+      vpn,
+      ppn,
+      flags: PTEFlags::empty(),
+      frame: None,
+    }
+  }
+
+  #[allow(unused)]
+  pub fn with_vpn(mut self, vpn: VirtPageNum) -> Self {
+    self.vpn = vpn;
+    self
+  }
+
+  #[allow(unused)]
+  pub fn with_ppn(mut self, ppn: PhysPageNum) -> Self {
+    self.ppn = ppn;
+    self
+  }
+
+  pub fn with_flags(mut self, flags: PTEFlags) -> Self {
+    self.flags = flags;
+    self
+  }
+
+  pub fn with_frame(mut self, frame: Option<FrameTracker>) -> Self {
+    self.frame = frame;
+    self
+  }
+}
+
+impl UnmapArgs {
+  pub fn builder(vpn: VirtPageNum) -> Self {
+    Self {
+      vpn,
+      dealloc: false,
+      panic: false,
+    }
+  }
+
+  #[allow(unused)]
+  pub fn with_vpn(mut self, vpn: VirtPageNum) -> Self {
+    self.vpn = vpn;
+    self
+  }
+
+  pub fn with_dealloc(mut self, dealloc: bool) -> Self {
+    self.dealloc = dealloc;
+    self
+  }
+
+  pub fn with_panic(mut self, panic: bool) -> Self {
+    self.panic = panic;
+    self
+  }
+}
+
 pub struct PageTable {
   root_ppn: PhysPageNum,
   frames_holder: BTreeSet<FrameTracker>,
@@ -99,7 +171,8 @@ impl PageTable {
     self.find_pte(vpn).map(|pte| *pte)
   }
 
-  pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags, mut frame: Option<FrameTracker>) {
+  pub fn map(&mut self, args: MapArgs) {
+    let MapArgs { vpn, ppn, flags, mut frame } = args;
     let pte = self.find_pte_create(vpn).unwrap();
     assert!(!pte.is_valid(), "vpn {:?} is mapped but should not", vpn);
 
@@ -112,11 +185,18 @@ impl PageTable {
     }
   }
 
-  pub fn unmap(&mut self, vpn: VirtPageNum, dealloc: bool) {
-    let pte = self.find_pte(vpn).unwrap();
-    assert!(pte.is_valid(), "vpn {:?} should mapped but not", vpn);
+  pub fn unmap(&mut self, args: UnmapArgs) {
+    let vpn = args.vpn;
+    let pte = match self.find_pte(vpn) {
+      Some(pte) if pte.is_valid() => pte,
+      _ => if args.panic {
+        panic!("vpn {:?} should mapped but not", vpn);
+      } else {
+        return;
+      }
+    };
     *pte = PageTableEntry::empty();
-    if dealloc {
+    if args.dealloc {
       // TODO: release record in self.frames
       let dummy_key = FrameTrackerMarker::new(pte.ppn());
       let key_to_remove = dummy_key.frame_tracker_ref();
