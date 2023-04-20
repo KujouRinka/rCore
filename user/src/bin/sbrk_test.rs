@@ -20,19 +20,30 @@ fn main() -> i32 {
     let brk = sbrk(0);
     println!("one page allocated,  break point = {:x}", brk);
     println!("try write to allocated page");
-    let new_page = unsafe {
+    let mut new_page = unsafe {
         &mut *slice_from_raw_parts_mut(origin_brk as usize as *const u8 as *mut u8, PAGE_SIZE)
     };
     for pos in 0..PAGE_SIZE {
         new_page[pos] = 1;
     }
     println!("write ok");
-    sbrk(PAGE_SIZE as i32 * 1000);
+    let alloc_pg = 100000;
+    let dealloc_pg = alloc_pg + 1;
+    sbrk(PAGE_SIZE as i32 * alloc_pg);
     let brk = sbrk(0);
-    println!("10 page allocated,  break point = {:x}", brk);
-    sbrk(PAGE_SIZE as i32 * -1001);
+    println!("{} page allocated,  break point = {:x}", alloc_pg, brk);
+    println!("try write more to allocated 10 page");
+    for i in 1..10 {
+        new_page = unsafe {
+            &mut *slice_from_raw_parts_mut((brk as usize - i * PAGE_SIZE) as usize as *const u8 as *mut u8, PAGE_SIZE)
+        };
+        for pos in 0..PAGE_SIZE {
+            new_page[pos] = 1;
+        }
+    }
+    sbrk(PAGE_SIZE as i32 * -dealloc_pg);
     let brk = sbrk(0);
-    println!("11 page DEALLOCATED,  break point = {:x}", brk);
+    println!("{} page DEALLOCATED,  break point = {:x}", dealloc_pg, brk);
     println!("try DEALLOCATED more one page, should be failed.");
     let ret = sbrk(PAGE_SIZE as i32 * -1);
     if ret != -1 {

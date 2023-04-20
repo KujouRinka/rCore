@@ -9,7 +9,7 @@ extern crate user_lib;
 #[no_mangle]
 fn main() -> i32 {
   // print_stack();
-  recursive(5);
+  recursive(2);
   0
 }
 
@@ -21,6 +21,7 @@ fn recursive(i: i32) {
     return;
   }
   // run this without optimization
+  recursive(i - 1);
   recursive(i - 1);
 }
 
