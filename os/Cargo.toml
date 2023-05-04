@@ -15,5 +15,6 @@ xmas-elf = "0.9"
 cfg-if = "1.0"
 
 [features]
-default = ["sbrk_lazy_alloc"]
+default = ["sbrk_lazy_alloc", "copy_on_write"]
 sbrk_lazy_alloc = []
+copy_on_write = []
