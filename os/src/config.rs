@@ -15,25 +15,3 @@ pub const TRAP_CONTEXT: usize = TRAMPOLINE - PAGE_SIZE;
 
 pub const MEMORY_END: usize = 0x88000000;  // 128M
 // pub const MEMORY_END: usize = 0x80800000;     // 8M
-
-/// # Layout
-/// ```
-/// +-------------------+
-/// |    Trampoline     |
-/// |-------------------|
-/// |    Guard Page     |
-/// |-------------------|
-/// |  Kernel Stack 0   |
-/// |-------------------|
-/// |    Guard Page     |
-/// |-------------------|
-/// |  Kernel Stack 1   |
-/// |-------------------|
-/// |        ...        |
-/// |                   |
-/// ```
-pub fn kernel_stack_position(app_id: usize) -> (usize, usize) {
-  let top = TRAMPOLINE - app_id * (KERNEL_STACK_SIZE + PAGE_SIZE);
-  let bottom = top - KERNEL_STACK_SIZE;
-  (bottom, top)
-}

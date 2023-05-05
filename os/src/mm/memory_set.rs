@@ -238,6 +238,16 @@ impl MemorySet {
     }
   }
 
+  pub fn remove_area_with_start_vpn(&mut self, start_vpn: VirtPageNum) {
+    match self.areas.get_mut(&start_vpn) {
+      Some(area) => {
+        area.unmap(&mut self.page_table);
+        self.areas.remove(&start_vpn);
+      }
+      None => return,
+    }
+  }
+
   pub fn activate(&self) {
     let satp = self.page_table.token();
     unsafe {
