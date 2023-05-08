@@ -195,6 +195,23 @@ impl MemorySet {
     )
   }
 
+  pub fn from_another(another: &MemorySet) -> Self {
+    // TODO: may do COW here
+    let mut memory_set = Self::new_bare();
+    memory_set.map_trampoline();
+    for (start_vpn, ma) in another.areas.iter() {
+      memory_set.areas.insert(start_vpn.clone(), ma.clone());
+      memory_set.push(ma.clone(), None);
+      for vpn in ma {
+        let src_ppn = another.page_table.translate(vpn).unwrap().ppn();
+        let dst_ppn = memory_set.page_table.translate(vpn).unwrap().ppn();
+        dst_ppn.get_bytes_array()
+          .copy_from_slice(src_ppn.get_bytes_array());
+      }
+    }
+    memory_set
+  }
+
   fn map_trampoline(&mut self) {
     self.page_table.map(
       MapArgs::builder(
@@ -234,7 +251,8 @@ impl MemorySet {
         UnmapArgs::builder(vpn)
           .with_dealloc(true)
           .with_panic(false),
-      )
+      );
+      self.areas.remove(&vpn);
     }
   }
 
@@ -314,6 +332,7 @@ bitflags! {
   }
 }
 
+#[derive(Clone)]
 struct MapArea {
   vpn_range: VPNRange,
   map_type: MapType,
@@ -334,6 +353,10 @@ impl MapArea {
       map_type,
       map_perm,
     }
+  }
+
+  fn from_another(another: &MapArea) -> Self {
+    another.clone()
   }
 
   /// Map `self.vpn_range` to specified [`PageTable`].
