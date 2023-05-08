@@ -202,7 +202,7 @@ impl MemorySet {
     for (start_vpn, ma) in another.areas.iter() {
       memory_set.areas.insert(start_vpn.clone(), ma.clone());
       memory_set.push(ma.clone(), None);
-      for vpn in ma {
+      for vpn in ma.vpn_range {
         let src_ppn = another.page_table.translate(vpn).unwrap().ppn();
         let dst_ppn = memory_set.page_table.translate(vpn).unwrap().ppn();
         dst_ppn.get_bytes_array()
