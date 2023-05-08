@@ -51,7 +51,7 @@ lazy_static! {
 pub fn get_app_data_by_name(name: &str) -> Option<&'static [u8]> {
   APP_NAMES.iter()
     .enumerate()
-    .find(|(i, x)| {
+    .find(|(_, x)| {
       name == **x
     }).map(|(i, _)| get_app_data(i))
 }
