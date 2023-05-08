@@ -9,7 +9,7 @@ use crate::sync::UPSafeCell;
 use crate::task::context::TaskContext;
 use crate::trap::context::TrapContext;
 use crate::trap::trap_handler;
-use crate::task::pid::{kernel_stack_position, KernelStack, PidHandle};
+use crate::task::pid::{kernel_stack_position, KernelStack, pid_alloc, PidHandle};
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub enum TaskStatus {
@@ -30,7 +30,14 @@ pub struct TaskControlBlock {
 impl TaskControlBlock {
   /// Only used for creating initproc
   pub fn new(elf_data: &[u8]) -> Self {
-    unimplemented!()
+    let pid = pid_alloc();
+    let kernel_stack = KernelStack::new(&pid);
+    let inner = unsafe { UPSafeCell::new(TaskControlBlockInner::new(elf_data, pid.0)) };
+    Self {
+      pid,
+      kernel_stack,
+      inner,
+    }
   }
 
   pub fn exec(&self, elf_data: &[u8]) {
@@ -38,7 +45,34 @@ impl TaskControlBlock {
   }
 
   pub fn fork(self: &Arc<TaskControlBlock>) -> Arc<TaskControlBlock> {
-    unimplemented!()
+    let pid = pid_alloc();
+    let kernel_stack = KernelStack::new(&pid);
+
+    let parent_inner = self.inner_borrow();
+    let memory_set = MemorySet::from_another(&parent_inner.memory_set);
+    let trap_cx_ppn = memory_set.translate(VirtAddr::from(TRAP_CONTEXT).into()).unwrap().ppn();
+    let kernel_stack_top = kernel_stack.get_top();
+
+    let tcb_inner = TaskControlBlockInner {
+      task_status: TaskStatus::Ready,
+      task_cx: TaskContext::goto_trap_return(kernel_stack_top),
+      memory_set,
+      trap_cx_ppn,
+      heap_bottom: parent_inner.heap_bottom,
+      program_brk: parent_inner.program_brk,
+      parent: Some(Arc::downgrade(self)),
+      children: Vec::new(),
+      xcode: 0,
+    };
+    let new_tcb = TaskControlBlock {
+      pid,
+      kernel_stack,
+      inner: unsafe { UPSafeCell::new(tcb_inner) },
+    };
+    new_tcb.inner_exclusive_access().get_trap_cx().kernel_sp = kernel_stack_top;
+    let ret = Arc::new(new_tcb);
+    parent_inner.children.push(Arc::clone(&ret));
+    ret
   }
 
   pub fn inner_borrow(&self) -> Ref<'_, TaskControlBlockInner> {
@@ -80,13 +114,13 @@ pub struct TaskControlBlockInner {
 }
 
 impl TaskControlBlockInner {
-  pub fn new(elf_data: &[u8], app_id: usize) -> Self {
+  pub fn new(elf_data: &[u8], pid: usize) -> Self {
     let (memory_set, user_stack_top, heap_bottom, entry_point) = MemorySet::from_elf(elf_data);
     let trap_cx_ppn = memory_set
       .translate(VirtAddr::from(TRAP_CONTEXT).into())
       .unwrap()
       .ppn();
-    let (kernel_bottom, kernel_top) = kernel_stack_position(app_id);
+    let (kernel_bottom, kernel_top) = kernel_stack_position(pid);
     unsafe {
       KERNEL_SPACE.exclusive_access()
         .insert_framed_area(
@@ -104,7 +138,7 @@ impl TaskControlBlockInner {
       program_brk: heap_bottom,
       parent: None,
       children: Vec::new(),
-      xcode: -1,
+      xcode: 0,
     };
     let trap_cx = tcb.get_trap_cx();
     let to_write_cx = TrapContext::app_init_context(
