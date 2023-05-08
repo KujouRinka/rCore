@@ -75,7 +75,8 @@ pub fn trap_handler() -> ! {
     | Trap::Exception(Exception::LoadFault)
     | Trap::Exception(Exception::LoadPageFault) => {
       let tcb = get_current_tcb_ref();
-      let ok = if stval >= tcb.heap_bottom && stval < tcb.program_brk {
+      let tcb_inner = tcb.inner_borrow();
+      let ok = if stval >= tcb_inner.heap_bottom && stval < tcb_inner.program_brk {
         // lazy allocation for sbrk()
         #[cfg(feature = "sbrk_lazy_alloc")] {
           lazy_alloc_page(stval.into())
@@ -84,7 +85,7 @@ pub fn trap_handler() -> ! {
           false
         }
       } else {
-        match tcb.memory_set.translate(VirtAddr::from(stval).into()) {
+        match tcb_inner.memory_set.translate(VirtAddr::from(stval).into()) {
           Some(pte) if pte.is_valid() && pte.is_readable() && pte.is_cow_page() => {
             // copy on write
             true
