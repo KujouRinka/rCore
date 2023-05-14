@@ -29,7 +29,7 @@ pub struct TaskControlBlock {
 
 impl TaskControlBlock {
   /// Only used for creating initproc
-  pub fn new(elf_data: &[u8]) -> Self {
+  pub fn new_for_initproc(elf_data: &[u8]) -> Self {
     let pid = pid_alloc();
     let kernel_stack = KernelStack::new(&pid);
     let inner = unsafe { UPSafeCell::new(TaskControlBlockInner::new(elf_data, pid.0)) };
@@ -41,7 +41,22 @@ impl TaskControlBlock {
   }
 
   pub fn exec(&self, elf_data: &[u8]) {
-    unimplemented!()
+    let (memory_set, user_stack_top, _, entry_point) = MemorySet::from_elf(elf_data);
+
+    let trap_cx_ppn = memory_set.translate(VirtAddr::from(TRAP_CONTEXT).into()).unwrap().ppn();
+
+    let mut inner = self.inner.exclusive_access();
+    inner.trap_cx_ppn = trap_cx_ppn;
+    inner.memory_set = memory_set;
+
+    let trap_cx = inner.get_trap_cx();
+    *trap_cx = TrapContext::app_init_context(
+      entry_point,
+      user_stack_top,
+      KERNEL_SPACE.exclusive_access().token(),
+      self.kernel_stack.get_top(),
+      trap_handler as usize,
+    );
   }
 
   pub fn fork(self: &Arc<TaskControlBlock>) -> Arc<TaskControlBlock> {
