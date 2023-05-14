@@ -1,10 +1,11 @@
 use alloc::collections::BTreeSet;
+use alloc::string::String;
 use alloc::vec::Vec;
 use bitflags::*;
 use crate::config::{PAGE_SIZE, PTE_FLAGS_BITS};
 use crate::mm::address::{PhysPageNum, VirtPageNum};
 use crate::mm::frame_allocator::{frame_alloc, FrameTracker, FrameTrackerMarker};
-use crate::mm::VirtAddr;
+use crate::mm::{PhysAddr, VirtAddr};
 
 bitflags! {
   pub struct PTEFlags: u16 {
@@ -171,6 +172,12 @@ impl PageTable {
     self.find_pte(vpn).map(|pte| *pte)
   }
 
+  pub fn translate_va(&self, va: VirtAddr) -> Option<PhysAddr> {
+    self.find_ppn(va.clone().floor()).map(|ppn| {
+      (PhysAddr::from(ppn).0 + va.page_offset()).into()
+    })
+  }
+
   pub fn map(&mut self, args: MapArgs) {
     let MapArgs { vpn, ppn, flags, mut frame } = args;
     let pte = self.find_pte_create(vpn).unwrap();
@@ -255,11 +262,29 @@ pub fn translated_byte_buffer(
   let mut ret = Vec::with_capacity(len / PAGE_SIZE + 1);
   while len_to_find > 0 {
     let va = VirtAddr::from(cur_va);
+    // TODO: fix malicious input
     let ppn = page_table.find_ppn(va.floor()).unwrap();
     let cur_len = PAGE_SIZE.min(len_to_find.min(PAGE_SIZE - va.page_offset()));
     ret.push(&ppn.get_bytes_array()[va.page_offset()..va.page_offset() + cur_len]);
     len_to_find -= cur_len;
     cur_va += cur_len;
+  }
+  ret
+}
+
+pub fn translate_str(page_table_token: usize, va_ptr: *const u8) -> String {
+  let page_table = PageTable::from_token(page_table_token);
+  let mut ret = String::new();
+  let mut va = va_ptr as usize;
+  // TODO: performance & security
+  loop {
+    let ch = *(page_table.translate_va(va.into())).unwrap().get_mut::<u8>();
+    if ch == 0 {
+      break;
+    } else {
+      ret.push(ch as char);
+      va += 1;
+    }
   }
   ret
 }
