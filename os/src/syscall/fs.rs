@@ -4,6 +4,10 @@ use crate::task::get_current_token;
 
 const FD_STDOUT: usize = 1;
 
+pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
+  unimplemented!()
+}
+
 pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
   match fd {
     FD_STDOUT => {

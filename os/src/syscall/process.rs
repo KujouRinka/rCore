@@ -7,6 +7,22 @@ use crate::task::{
 };
 use crate::timer::get_time_ms;
 
+pub fn sys_getpid() -> isize {
+  unimplemented!()
+}
+
+pub fn sys_fork() -> isize {
+  unimplemented!()
+}
+
+pub fn sys_exec(name: *const u8) -> isize {
+  unimplemented!()
+}
+
+pub fn sys_waitpid(pid: usize) -> isize {
+  unimplemented!()
+}
+
 pub fn sys_exit(xstate: i32) -> ! {
   info!("[kernel] Application {} exited with code {}", get_current_task_id(), xstate);
   exit_current_and_run_next()
