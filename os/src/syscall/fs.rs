@@ -1,11 +1,36 @@
 use crate::mm::translated_byte_buffer;
 use crate::print;
-use crate::task::get_current_token;
+use crate::sbi::console_getchat;
+use crate::task::{get_current_token, suspend_current_and_run_next};
 
+const FD_STDIN: usize = 0;
 const FD_STDOUT: usize = 1;
 
 pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
-  unimplemented!()
+  match fd {
+    FD_STDIN => {
+      assert_eq!(len, 1, "Only support len = 1 in sys_read!");
+      let mut c: usize;
+      loop {
+        c = console_getchat();
+        if c == 0 {
+          suspend_current_and_run_next();
+          continue;
+        } else {
+          break;
+        }
+      }
+      let ch = c as u8;
+      let mut buffers = translated_byte_buffer(get_current_token(), buf, len);
+      unsafe {
+        buffers[0].as_mut_ptr().write_volatile(ch);
+      }
+      len as isize
+    }
+    _ => {
+      panic!("Unsupported fd in sys_read: {}", fd);
+    }
+  }
 }
 
 pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
