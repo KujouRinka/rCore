@@ -31,6 +31,7 @@ pub fn main() -> i32 {
                     let pid = fork();
                     if pid == 0 {
                         // child process
+                        println!("fork ok");
                         if exec(line.as_str()) == -1 {
                             println!("Error when executing!");
                             return -4;
