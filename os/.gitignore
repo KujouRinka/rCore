@@ -3,3 +3,4 @@
 src/link_app.S
 run.sh
 run.log
+kernel.asm
