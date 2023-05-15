@@ -8,8 +8,7 @@ mod memory_set;
 
 pub use address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum};
 pub use frame_allocator::{frame_alloc, FrameTracker};
-pub use memory_set::remap_test;
-pub use memory_set::{MapPermission, MemorySet, KERNEL_SPACE};
+pub use memory_set::{remap_test, MapPermission, MemorySet, KERNEL_SPACE};
 pub use page_table::{translated_byte_buffer, translated_str, translated_copyout, PageTableEntry};
 
 pub fn init() {
@@ -17,7 +16,7 @@ pub fn init() {
   trace!("heap_allocator inited");
   frame_allocator::init_frame_allocator();
   trace!("frame_allocator inited");
-  KERNEL_SPACE.exclusive_access().activate();
+  KERNEL_SPACE.borrow_mut().activate();
   trace!("kernel_space inited");
 }
 

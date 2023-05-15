@@ -29,9 +29,9 @@ impl TaskManager {
 }
 
 pub fn add_task(task: Arc<TaskControlBlock>) {
-  TASK_MANAGER.exclusive_access().add(task);
+  TASK_MANAGER.borrow_mut().add(task);
 }
 
 pub fn fetch_task() -> Option<Arc<TaskControlBlock>> {
-  TASK_MANAGER.exclusive_access().fetch()
+  TASK_MANAGER.borrow_mut().fetch()
 }

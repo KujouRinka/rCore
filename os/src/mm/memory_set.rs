@@ -1,16 +1,19 @@
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
-// use alloc::vec::Vec;
 use core::arch::asm;
 use core::ptr;
 use lazy_static::lazy_static;
 use log::{debug, trace};
 use riscv::register::satp;
 use crate::config::*;
-use crate::mm::address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum, VPNRange};
-use crate::mm::frame_allocator::frame_alloc;
-use crate::mm::page_table::{MapArgs, PageTable, PTEFlags, UnmapArgs};
-use crate::mm::PageTableEntry;
+
+use crate::mm::{
+  PageTableEntry,
+  address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum, VPNRange},
+  frame_allocator::frame_alloc,
+  page_table::{MapArgs, PageTable, PTEFlags, UnmapArgs},
+};
+
 use crate::sync::UPSafeCell;
 use crate::vars::*;
 
@@ -364,10 +367,6 @@ impl MapArea {
     }
   }
 
-  fn from_another(another: &MapArea) -> Self {
-    another.clone()
-  }
-
   /// Map `self.vpn_range` to specified [`PageTable`].
   fn map(&mut self, page_table: &mut PageTable) {
     for vpn in self.vpn_range {
@@ -455,7 +454,7 @@ impl MapArea {
 
 #[allow(unused)]
 pub fn remap_test() {
-  let mut kernel_space = KERNEL_SPACE.exclusive_access();
+  let mut kernel_space = KERNEL_SPACE.borrow_mut();
   let mid_text: VirtAddr = ((stext as usize + etext as usize) / 2).into();
   let mid_rodata: VirtAddr = ((srodata as usize + erodata as usize) / 2).into();
   let mid_data: VirtAddr = ((sdata as usize + edata as usize) / 2).into();

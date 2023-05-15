@@ -8,7 +8,7 @@ pub struct PidHandle(pub usize);
 
 impl Drop for PidHandle {
   fn drop(&mut self) {
-    PID_ALLOCATOR.exclusive_access().dealloc(self.0);
+    PID_ALLOCATOR.borrow_mut().dealloc(self.0);
   }
 }
 
@@ -52,7 +52,7 @@ lazy_static! {
 }
 
 pub fn pid_alloc() -> PidHandle {
-  PID_ALLOCATOR.exclusive_access().alloc()
+  PID_ALLOCATOR.borrow_mut().alloc()
 }
 
 pub struct KernelStack {
@@ -64,7 +64,7 @@ impl KernelStack {
     let pid = pid_handle.0;
     let (kernel_stack_bottom, kernel_stack_top) = kernel_stack_position(pid);
     unsafe {
-      KERNEL_SPACE.exclusive_access()
+      KERNEL_SPACE.borrow_mut()
         .insert_framed_area(
           kernel_stack_bottom.into(),
           kernel_stack_top.into(),
@@ -74,6 +74,7 @@ impl KernelStack {
     Self { pid }
   }
 
+  #[allow(unused)]
   pub fn push_on_top<T>(&self, value: T) -> *mut T
     where T: Sized
   {
@@ -91,7 +92,7 @@ impl KernelStack {
 impl Drop for KernelStack {
   fn drop(&mut self) {
     let (kernel_stack_bottom, _) = kernel_stack_position(self.pid);
-    KERNEL_SPACE.exclusive_access()
+    KERNEL_SPACE.borrow_mut()
       .remove_area_with_start_vpn(VirtAddr::from(kernel_stack_bottom).into());
   }
 }

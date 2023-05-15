@@ -6,16 +6,18 @@ use cfg_if::cfg_if;
 use crate::config::*;
 use crate::mm::{KERNEL_SPACE, MapPermission, MemorySet, PhysPageNum, VirtAddr};
 use crate::sync::UPSafeCell;
-use crate::task::context::TaskContext;
-use crate::trap::context::TrapContext;
-use crate::trap::trap_handler;
-use crate::task::pid::{kernel_stack_position, KernelStack, pid_alloc, PidHandle};
+use crate::task::{
+  context::TaskContext,
+  pid::{kernel_stack_position, KernelStack, pid_alloc, PidHandle},
+};
+use crate::trap::{context::TrapContext, trap_handler};
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub enum TaskStatus {
   Ready,
   Running,
   Zombie,
+  #[allow(unused)]
   Exited,
 }
 
@@ -45,7 +47,7 @@ impl TaskControlBlock {
 
     let trap_cx_ppn = memory_set.translate(VirtAddr::from(TRAP_CONTEXT).into()).unwrap().ppn();
 
-    let mut inner = self.inner.exclusive_access();
+    let mut inner = self.inner.borrow_mut();
     inner.trap_cx_ppn = trap_cx_ppn;
     inner.memory_set = memory_set;
 
@@ -53,7 +55,7 @@ impl TaskControlBlock {
     *trap_cx = TrapContext::app_init_context(
       entry_point,
       user_stack_top,
-      KERNEL_SPACE.exclusive_access().token(),
+      KERNEL_SPACE.borrow_mut().token(),
       self.kernel_stack.get_top(),
       trap_handler as usize,
     );
@@ -63,7 +65,7 @@ impl TaskControlBlock {
     let pid = pid_alloc();
     let kernel_stack = KernelStack::new(&pid);
 
-    let mut parent_inner = self.inner_exclusive_access();
+    let mut parent_inner = self.inner_borrow_mut();
     let memory_set = MemorySet::from_another(&parent_inner.memory_set);
     let trap_cx_ppn = memory_set.translate(VirtAddr::from(TRAP_CONTEXT).into()).unwrap().ppn();
     let kernel_stack_top = kernel_stack.get_top();
@@ -84,7 +86,7 @@ impl TaskControlBlock {
       kernel_stack,
       inner: unsafe { UPSafeCell::new(tcb_inner) },
     };
-    new_tcb.inner_exclusive_access().get_trap_cx().kernel_sp = kernel_stack_top;
+    new_tcb.inner_borrow_mut().get_trap_cx().kernel_sp = kernel_stack_top;
     let ret = Arc::new(new_tcb);
     parent_inner.children.push(Arc::clone(&ret));
     ret
@@ -94,21 +96,21 @@ impl TaskControlBlock {
     self.inner.borrow()
   }
 
-  pub fn inner_exclusive_access(&self) -> RefMut<'_, TaskControlBlockInner> {
-    self.inner.exclusive_access()
+  pub fn inner_borrow_mut(&self) -> RefMut<'_, TaskControlBlockInner> {
+    self.inner.borrow_mut()
   }
 
   pub fn get_pid(&self) -> usize {
     return self.pid.0;
   }
 
-  pub fn change_brk(&mut self, size: i32) -> Option<usize> {
-    self.inner_exclusive_access().change_brk(size)
+  pub fn change_brk(&self, size: i32) -> Option<usize> {
+    self.inner_borrow_mut().change_brk(size)
   }
 
   #[cfg(feature = "sbrk_lazy_alloc")]
-  pub fn lazy_alloc_page(&mut self, addr: VirtAddr) -> bool {
-    self.inner_exclusive_access().lazy_alloc_page(addr)
+  pub fn lazy_alloc_page(&self, addr: VirtAddr) -> bool {
+    self.inner_borrow_mut().lazy_alloc_page(addr)
   }
 }
 
@@ -151,7 +153,7 @@ impl TaskControlBlockInner {
     let to_write_cx = TrapContext::app_init_context(
       entry_point,
       user_stack_top,
-      KERNEL_SPACE.exclusive_access().token(),
+      KERNEL_SPACE.borrow_mut().token(),
       kernel_top,
       trap_handler as usize,
     );

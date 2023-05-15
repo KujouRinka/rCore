@@ -1,7 +1,6 @@
 use alloc::sync::Arc;
-use log::info;
 use crate::loader::get_app_data_by_name;
-use crate::mm::{translated_str, translated_byte_buffer, translated_copyout};
+use crate::mm::{translated_str, translated_copyout};
 use crate::task::{
   get_current_task,
   suspend_current_and_run_next,
@@ -20,7 +19,7 @@ pub fn sys_getpid() -> isize {
 pub fn sys_fork() -> isize {
   let forking_task = get_current_task().fork();
   let child_pid = forking_task.pid.0;
-  let trap_cx = forking_task.inner_exclusive_access().get_trap_cx();
+  let trap_cx = forking_task.inner_borrow_mut().get_trap_cx();
 
   // set a0 register as 0 for return value for child proc
   trap_cx.regs[10] = 0;
@@ -42,7 +41,7 @@ pub fn sys_exec(path: *const u8) -> isize {
 
 pub fn sys_waitpid(pid: isize, xcode_ptr: *mut i32) -> isize {
   let task = get_current_task();
-  let mut task_inner = task.inner_exclusive_access();
+  let mut task_inner = task.inner_borrow_mut();
   if task_inner.children.iter()
     .find(|p| { pid == -1 || pid as usize == p.get_pid() })
     .is_none() {

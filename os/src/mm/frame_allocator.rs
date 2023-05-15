@@ -67,7 +67,7 @@ lazy_static! {
 }
 
 pub fn init_frame_allocator() {
-  FRAME_ALLOCATOR.exclusive_access()
+  FRAME_ALLOCATOR.borrow_mut()
     .init(
       PhysAddr::from(ekernel as usize).ceil(),
       PhysAddr::from(MEMORY_END).floor(),
@@ -119,14 +119,14 @@ impl Drop for FrameTracker {
 
 pub fn frame_alloc() -> Option<FrameTracker> {
   FRAME_ALLOCATOR
-    .exclusive_access()
+    .borrow_mut()
     .alloc()
     .map(FrameTracker::new)
 }
 
 pub fn frame_dealloc(ppn: PhysPageNum) {
   FRAME_ALLOCATOR
-    .exclusive_access()
+    .borrow_mut()
     .dealloc(ppn);
 }
 

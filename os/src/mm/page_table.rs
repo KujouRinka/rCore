@@ -3,9 +3,11 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use bitflags::*;
 use crate::config::{PAGE_SIZE, PTE_FLAGS_BITS};
-use crate::mm::address::{PhysPageNum, VirtPageNum};
-use crate::mm::frame_allocator::{frame_alloc, FrameTracker, FrameTrackerMarker};
-use crate::mm::{PhysAddr, VirtAddr};
+use crate::mm::{
+  address::{PhysPageNum, VirtPageNum},
+  frame_allocator::{frame_alloc, FrameTracker, FrameTrackerMarker},
+  {PhysAddr, VirtAddr},
+};
 
 bitflags! {
   pub struct PTEFlags: u16 {

@@ -1,21 +1,23 @@
-use alloc::sync::Arc;
-use lazy_static::lazy_static;
-use crate::loader::{get_app_data_by_name, list_apps};
-use crate::task::task::{TaskControlBlock, TaskStatus};
-use crate::task::context::TaskContext;
-use crate::task::processor::{current_task, schedule};
-pub(crate) use crate::task::manager::add_task;
-#[cfg(feature = "sbrk_lazy_alloc")]
-use crate::mm::VirtAddr;
-use crate::trap::context::TrapContext;
-pub(crate) use crate::task::processor::scheduler;
-
 mod switch;
 mod context;
 mod task;
 mod pid;
 mod manager;
 mod processor;
+
+use alloc::sync::Arc;
+use lazy_static::lazy_static;
+
+use task::{TaskControlBlock, TaskStatus};
+use context::TaskContext;
+use processor::{current_task, schedule};
+pub(crate) use manager::add_task;
+pub(crate) use processor::scheduler;
+
+use crate::loader::{get_app_data_by_name, list_apps};
+#[cfg(feature = "sbrk_lazy_alloc")]
+use crate::mm::VirtAddr;
+use crate::trap::context::TrapContext;
 
 pub fn init() {
   add_initproc();
@@ -46,7 +48,7 @@ pub fn get_current_task() -> Arc<TaskControlBlock> {
 // This is same as yield()
 pub fn suspend_current_and_run_next() {
   let task = get_current_task();
-  let mut inner = task.inner_exclusive_access();
+  let mut inner = task.inner_borrow_mut();
   inner.task_status = TaskStatus::Ready;
   let task_cx = &mut inner.task_cx as *mut TaskContext;
 
@@ -57,13 +59,13 @@ pub fn suspend_current_and_run_next() {
 
 pub fn exit_current_and_run_next(xcode: i32) -> ! {
   let task = get_current_task();
-  let mut task_inner = task.inner_exclusive_access();
+  let mut task_inner = task.inner_borrow_mut();
   task_inner.task_status = TaskStatus::Zombie;
   task_inner.xcode = xcode;
 
-  let mut initproc_inner = INITPROC.inner_exclusive_access();
+  let mut initproc_inner = INITPROC.inner_borrow_mut();
   for child in task_inner.children.iter() {
-    child.inner_exclusive_access().parent = Some(Arc::downgrade(&INITPROC));
+    child.inner_borrow_mut().parent = Some(Arc::downgrade(&INITPROC));
     initproc_inner.children.push(Arc::clone(child));
   }
   drop(initproc_inner);
@@ -98,8 +100,8 @@ pub fn get_current_tcb_ref() -> &'static TaskControlBlock {
 }
 
 pub fn change_program_brk(size: i32) -> Option<usize> {
-  if let Some(mut task) = current_task() {
-    task.inner_exclusive_access().change_brk(size)
+  if let Some(task) = current_task() {
+    task.change_brk(size)
   } else {
     None
   }
@@ -107,8 +109,8 @@ pub fn change_program_brk(size: i32) -> Option<usize> {
 
 #[cfg(feature = "sbrk_lazy_alloc")]
 pub fn lazy_alloc_page(addr: VirtAddr) -> bool {
-  if let Some(mut task) = current_task() {
-    task.inner_exclusive_access().lazy_alloc_page(addr)
+  if let Some(task) = current_task() {
+    task.lazy_alloc_page(addr)
   } else {
     false
   }

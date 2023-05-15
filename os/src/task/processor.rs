@@ -1,10 +1,12 @@
 use alloc::sync::Arc;
 use lazy_static::lazy_static;
 use crate::sync::UPSafeCell;
-use crate::task::context::TaskContext;
-use crate::task::manager::fetch_task;
-use crate::task::switch::__switch;
-use crate::task::task::{TaskControlBlock, TaskStatus};
+use crate::task::{
+  context::TaskContext,
+  manager::fetch_task,
+  switch::__switch,
+  task::{TaskControlBlock, TaskStatus},
+};
 use crate::trap::context::TrapContext;
 
 lazy_static! {
@@ -39,16 +41,18 @@ impl Processor {
   }
 }
 
+#[allow(unused)]
 pub fn take_current_task() -> Option<Arc<TaskControlBlock>> {
-  PROCESSOR.exclusive_access().take_current()
+  PROCESSOR.borrow_mut().take_current()
 }
 
 pub fn current_task() -> Option<Arc<TaskControlBlock>> {
-  PROCESSOR.exclusive_access().current()
+  PROCESSOR.borrow_mut().current()
 }
 
+#[allow(unused)]
 pub fn current_user_token() -> Option<usize> {
-  PROCESSOR.exclusive_access()
+  PROCESSOR.borrow_mut()
     .current
     .as_ref()
     .map(|x| {
@@ -56,6 +60,7 @@ pub fn current_user_token() -> Option<usize> {
     })
 }
 
+#[allow(unused)]
 pub fn current_trap_cx() -> Option<&'static mut TrapContext> {
   current_task().map(|x| {
     x.inner_borrow().get_trap_cx()
@@ -63,7 +68,7 @@ pub fn current_trap_cx() -> Option<&'static mut TrapContext> {
 }
 
 pub fn schedule(switched_task_cx_ptr: *mut TaskContext) {
-  let mut processor = PROCESSOR.exclusive_access();
+  let mut processor = PROCESSOR.borrow_mut();
   let this_cpu_scheduler_cx = processor.get_scheduler_cx_mut_ptr();
   drop(processor);
   unsafe {
@@ -76,10 +81,10 @@ pub fn schedule(switched_task_cx_ptr: *mut TaskContext) {
 
 pub fn scheduler() {
   loop {
-    let mut processor = PROCESSOR.exclusive_access();
+    let mut processor = PROCESSOR.borrow_mut();
     if let Some(next_task) = fetch_task() {
       let this_scheduler_cx = processor.get_scheduler_cx_mut_ptr();
-      let mut next_task_inner = next_task.inner_exclusive_access();
+      let mut next_task_inner = next_task.inner_borrow_mut();
       if next_task_inner.task_status != TaskStatus::Ready {
         continue;
       }
