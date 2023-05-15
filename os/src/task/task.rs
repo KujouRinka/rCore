@@ -63,7 +63,7 @@ impl TaskControlBlock {
     let pid = pid_alloc();
     let kernel_stack = KernelStack::new(&pid);
 
-    let parent_inner = self.inner_borrow();
+    let mut parent_inner = self.inner_exclusive_access();
     let memory_set = MemorySet::from_another(&parent_inner.memory_set);
     let trap_cx_ppn = memory_set.translate(VirtAddr::from(TRAP_CONTEXT).into()).unwrap().ppn();
     let kernel_stack_top = kernel_stack.get_top();

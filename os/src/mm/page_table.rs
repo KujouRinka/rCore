@@ -263,7 +263,7 @@ pub fn translated_byte_buffer(
   page_table_token: usize,
   va_ptr: *const u8,
   len: usize,
-) -> Vec<&'static [u8]> {
+) -> Vec<&'static mut [u8]> {
   let page_table = PageTable::from_token(page_table_token);
   let mut len_to_find = len;
   let mut cur_va = va_ptr as usize;
@@ -273,7 +273,7 @@ pub fn translated_byte_buffer(
     // TODO: fix malicious input
     let ppn = page_table.find_ppn(va.floor()).unwrap();
     let cur_len = PAGE_SIZE.min(len_to_find.min(PAGE_SIZE - va.page_offset()));
-    ret.push(&ppn.get_bytes_array()[va.page_offset()..va.page_offset() + cur_len]);
+    ret.push(&mut ppn.get_bytes_array()[va.page_offset()..va.page_offset() + cur_len]);
     len_to_find -= cur_len;
     cur_va += cur_len;
   }

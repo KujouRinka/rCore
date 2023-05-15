@@ -77,16 +77,16 @@ pub fn scheduler() {
     let mut processor = PROCESSOR.exclusive_access();
     if let Some(next_task) = fetch_task() {
       let this_scheduler_cx = processor.get_scheduler_cx_mut_ptr();
-      let next_task_inner = next_task.inner_exclusive_access();
+      let mut next_task_inner = next_task.inner_exclusive_access();
       if next_task_inner.task_status != TaskStatus::Ready {
         continue;
       }
       let next_task_cx_ptr = &next_task_inner.task_cx as *const TaskContext;
       next_task_inner.task_status = TaskStatus::Running;
-      processor.current = Some(next_task);
 
       drop(this_scheduler_cx);
       drop(next_task_inner);
+      processor.current = Some(next_task);
       unsafe {
         __switch(
           this_scheduler_cx,

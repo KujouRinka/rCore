@@ -40,7 +40,7 @@ pub fn get_current_task() -> Arc<TaskControlBlock> {
 // This is same as yield()
 pub fn suspend_current_and_run_next() {
   let task = get_current_task();
-  let inner = task.inner_exclusive_access();
+  let mut inner = task.inner_exclusive_access();
   inner.task_status = TaskStatus::Ready;
   let task_cx = &mut inner.task_cx as *mut TaskContext;
 
@@ -50,14 +50,15 @@ pub fn suspend_current_and_run_next() {
 }
 
 pub fn exit_current_and_run_next(xcode: i32) -> ! {
-  let task_inner = get_current_task().inner_exclusive_access();
+  let task = get_current_task();
+  let mut task_inner = task.inner_exclusive_access();
   task_inner.task_status = TaskStatus::Zombie;
   task_inner.xcode = xcode;
 
   let mut initproc_inner = INITPROC.inner_exclusive_access();
-  for child in task_inner.children.into_iter() {
+  for child in task_inner.children.iter() {
     child.inner_exclusive_access().parent = Some(Arc::downgrade(&INITPROC));
-    initproc_inner.children.push(child);
+    initproc_inner.children.push(Arc::clone(child));
   }
   drop(initproc_inner);
 
@@ -66,6 +67,7 @@ pub fn exit_current_and_run_next(xcode: i32) -> ! {
     task_inner.memory_set.recycle_pages();
   }
   drop(task_inner);
+  drop(task);
 
   let mut dummy = TaskContext::zero_init();
   schedule(&mut dummy as *mut _);
@@ -102,12 +104,12 @@ pub fn get_current_trap_cx() -> &'static mut TrapContext {
 }
 
 pub fn get_current_tcb_ref() -> &'static TaskControlBlock {
-  get_current_task().as_ref()
+  unsafe { core::mem::transmute(get_current_task().as_ref()) }
 }
 
 pub fn change_program_brk(size: i32) -> Option<usize> {
   if let Some(mut task) = current_task() {
-    task.change_brk(size)
+    task.inner_exclusive_access().change_brk(size)
   } else {
     None
   }
@@ -116,7 +118,7 @@ pub fn change_program_brk(size: i32) -> Option<usize> {
 #[cfg(feature = "sbrk_lazy_alloc")]
 pub fn lazy_alloc_page(addr: VirtAddr) -> bool {
   if let Some(mut task) = current_task() {
-    task.lazy_alloc_page(addr)
+    task.inner_exclusive_access().lazy_alloc_page(addr)
   } else {
     false
   }

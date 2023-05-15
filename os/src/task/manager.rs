@@ -10,7 +10,7 @@ lazy_static! {
   };
 }
 
-struct TaskManager {
+pub struct TaskManager {
   ready_queue: VecDeque<Arc<TaskControlBlock>>,
 }
 
