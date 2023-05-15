@@ -101,12 +101,12 @@ pub fn trap_handler() -> ! {
       };
       if !ok {
         warn!("[kernel] PageFault in application, bad addr = {:#x}, bad instruction = {:#x}, kernel killed it.", stval, cx.sepc);
-        exit_current_and_run_next();
+        exit_current_and_run_next(-2);
       }
     }
     Trap::Exception(Exception::IllegalInstruction) => {
       warn!("[kernel] IllegalInstruction in application, kernel killed it.");
-      exit_current_and_run_next();
+      exit_current_and_run_next(-3);
     }
     Trap::Interrupt(Interrupt::SupervisorTimer) => {
       set_next_trigger();
@@ -114,7 +114,7 @@ pub fn trap_handler() -> ! {
     }
     _ => {
       warn!("Unsupported trap {:?}, stval = {:#x}", scause.cause(), stval);
-      exit_current_and_run_next();
+      exit_current_and_run_next(-1);
     }
   }
   trap_return()

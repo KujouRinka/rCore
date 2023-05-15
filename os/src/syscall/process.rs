@@ -1,6 +1,7 @@
+use alloc::sync::Arc;
 use log::info;
 use crate::loader::get_app_data_by_name;
-use crate::mm::translate_str;
+use crate::mm::{translated_str, translated_byte_buffer, translated_copyout};
 use crate::task::{
   get_current_task,
   suspend_current_and_run_next,
@@ -30,7 +31,7 @@ pub fn sys_fork() -> isize {
 
 pub fn sys_exec(path: *const u8) -> isize {
   let token = get_current_token();
-  let path = translate_str(token, path);
+  let path = translated_str(token, path);
   if let Some(data) = get_app_data_by_name(path.as_str()) {
     get_current_task().exec(data);
     0
@@ -39,13 +40,33 @@ pub fn sys_exec(path: *const u8) -> isize {
   }
 }
 
-pub fn sys_waitpid(pid: usize) -> isize {
-  unimplemented!()
+pub fn sys_waitpid(pid: isize, xcode_ptr: *mut i32) -> isize {
+  let task_inner = get_current_task().inner_exclusive_access();
+  if task_inner.children.iter()
+    .find(|p| { pid == -1 || pid as usize == p.get_pid() })
+    .is_none() {
+    return -1;
+  }
+  let pair = task_inner.children.iter()
+    .enumerate()
+    .find(|(_, p)| {
+      p.inner_borrow().is_zombie() && (pid == -1 || pid as usize == p.get_pid())
+    });
+  if let Some((idx, _)) = pair {
+    let child = task_inner.children.remove(idx);
+    assert_eq!(Arc::strong_count(&child), 1);
+    let found_pid = child.get_pid();
+    let xcode = child.inner_borrow().xcode;
+    translated_copyout(task_inner.get_user_token(), xcode_ptr, xcode);
+    found_pid as isize
+  } else {
+    -2
+  }
 }
 
-pub fn sys_exit(xstate: i32) -> ! {
-  info!("[kernel] Application {} exited with code {}", get_current_pid(), xstate);
-  exit_current_and_run_next()
+pub fn sys_exit(xcode: i32) -> ! {
+  info!("[kernel] Application {} exited with code {}", get_current_pid(), xcode);
+  exit_current_and_run_next(xcode)
 }
 
 pub fn sys_get_taskinfo() -> isize {

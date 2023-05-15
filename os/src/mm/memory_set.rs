@@ -282,6 +282,15 @@ impl MemorySet {
     self.page_table.translate(vpn)
   }
 
+  /// Manually drop all Physical page the [MemorySet] holds
+  /// without clean PTEs in [PageTable]
+  /// # Safety
+  /// [MemorySet] is invalid after calling this.
+  pub unsafe fn recycle_pages(&mut self) {
+    self.areas.clear();
+    self.page_table.recycle_pages();
+  }
+
   #[allow(unused)]
   pub fn shrink_to(&mut self, start: VirtAddr, new_end: VirtAddr) -> bool {
     if let Some(area) = self.areas.get_mut(&start.into()) {

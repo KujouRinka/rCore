@@ -210,6 +210,14 @@ impl PageTable {
       self.frames_holder.remove(&key_to_remove);
     }
   }
+
+  /// Manually drop all Physical page the [PageTable] holds
+  /// without clean PTEs in [PageTable]
+  /// # Safety
+  /// [PageTable] is invalid after calling this.
+  pub unsafe fn recycle_pages(&mut self) {
+    self.frames_holder.clear();
+  }
 }
 
 impl PageTable {
@@ -272,7 +280,7 @@ pub fn translated_byte_buffer(
   ret
 }
 
-pub fn translate_str(page_table_token: usize, va_ptr: *const u8) -> String {
+pub fn translated_str(page_table_token: usize, va_ptr: *const u8) -> String {
   let page_table = PageTable::from_token(page_table_token);
   let mut ret = String::new();
   let mut va = va_ptr as usize;
@@ -287,4 +295,22 @@ pub fn translate_str(page_table_token: usize, va_ptr: *const u8) -> String {
     }
   }
   ret
+}
+
+/// Copy data `val` from kernel space to user space the `va_ptr` points to.
+pub fn translated_copyout<T>(token: usize, va_ptr: *mut T, val: T) {
+  let page_table = PageTable::from_token(token);
+  let mut src = &val as *const T as *mut u8;
+  let mut dst_va = va_ptr as usize;
+  for _ in 0..core::mem::size_of::<T>() {
+    unsafe {
+      let dst = page_table
+        .translate_va(VirtAddr::from(dst_va))
+        .unwrap()
+        .0 as *mut u8;
+      *dst = *src;
+      src = src.add(1);
+      dst_va = (dst_va as *const u8).add(1) as usize;
+    }
+  }
 }

@@ -49,27 +49,45 @@ pub fn suspend_current_and_run_next() {
   schedule(task_cx);
 }
 
-pub fn exit_current_and_run_next() -> ! {
-  mark_current_exited();
-  run_next_task();
+pub fn exit_current_and_run_next(xcode: i32) -> ! {
+  let task_inner = get_current_task().inner_exclusive_access();
+  task_inner.task_status = TaskStatus::Zombie;
+  task_inner.xcode = xcode;
+
+  let mut initproc_inner = INITPROC.inner_exclusive_access();
+  for child in task_inner.children.into_iter() {
+    child.inner_exclusive_access().parent = Some(Arc::downgrade(&INITPROC));
+    initproc_inner.children.push(child);
+  }
+  drop(initproc_inner);
+
+  // Manually call this to free all pages
+  unsafe {
+    task_inner.memory_set.recycle_pages();
+  }
+  drop(task_inner);
+
+  let mut dummy = TaskContext::zero_init();
+  schedule(&mut dummy as *mut _);
+
   panic!("Unreachable in exit_current_and_run_next")
 }
 
-pub fn run_first_task() {
-  TASK_MANAGER.run_first_task();
-}
-
-fn mark_current_suspended() {
-  TASK_MANAGER.mark_current_suspended();
-}
-
-fn mark_current_exited() {
-  TASK_MANAGER.mark_current_exited();
-}
-
-fn run_next_task() {
-  TASK_MANAGER.run_next_task();
-}
+// pub fn run_first_task() {
+//   TASK_MANAGER.run_first_task();
+// }
+//
+// fn mark_current_suspended() {
+//   TASK_MANAGER.mark_current_suspended();
+// }
+//
+// fn mark_current_exited() {
+//   TASK_MANAGER.mark_current_exited();
+// }
+//
+// fn run_next_task() {
+//   TASK_MANAGER.run_next_task();
+// }
 
 pub fn get_current_pid() -> isize {
   get_current_task().get_pid() as isize

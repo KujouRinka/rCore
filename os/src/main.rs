@@ -70,6 +70,6 @@ pub fn rust_main() -> ! {
   info!("timer interrupt opened");
   timer::set_next_trigger();
   info!("starting to run first task");
-  task::run_first_task();
+  // task::run_first_task();
   panic!("Unreachable in rust_main")
 }
