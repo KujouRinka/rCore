@@ -63,7 +63,9 @@ pub fn current_trap_cx() -> Option<&'static mut TrapContext> {
 }
 
 pub fn schedule(switched_task_cx_ptr: *mut TaskContext) {
-  let this_cpu_scheduler_cx = &PROCESSOR.borrow().scheduler_cx as *const TaskContext;
+  let mut processor = PROCESSOR.exclusive_access();
+  let this_cpu_scheduler_cx = processor.get_scheduler_cx_mut_ptr();
+  drop(processor);
   unsafe {
     __switch(
       switched_task_cx_ptr,
@@ -84,9 +86,9 @@ pub fn scheduler() {
       let next_task_cx_ptr = &next_task_inner.task_cx as *const TaskContext;
       next_task_inner.task_status = TaskStatus::Running;
 
-      drop(this_scheduler_cx);
       drop(next_task_inner);
       processor.current = Some(next_task);
+      drop(processor);
       unsafe {
         __switch(
           this_scheduler_cx,

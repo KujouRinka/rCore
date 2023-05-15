@@ -2,7 +2,7 @@ use alloc::vec::Vec;
 use lazy_static::lazy_static;
 use crate::sync::UPSafeCell;
 use crate::config::*;
-use crate::mm::{KERNEL_SPACE, MapPermission};
+use crate::mm::{KERNEL_SPACE, MapPermission, VirtAddr};
 
 pub struct PidHandle(pub usize);
 
@@ -92,7 +92,7 @@ impl Drop for KernelStack {
   fn drop(&mut self) {
     let (kernel_stack_bottom, _) = kernel_stack_position(self.pid);
     KERNEL_SPACE.exclusive_access()
-      .remove_area_with_start_vpn(kernel_stack_bottom.into());
+      .remove_area_with_start_vpn(VirtAddr::from(kernel_stack_bottom).into());
   }
 }
 

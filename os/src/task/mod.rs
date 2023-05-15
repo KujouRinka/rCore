@@ -1,6 +1,6 @@
 use alloc::sync::Arc;
 use lazy_static::lazy_static;
-use crate::loader::get_app_data_by_name;
+use crate::loader::{get_app_data_by_name, list_apps};
 use crate::task::task::{TaskControlBlock, TaskStatus};
 use crate::task::context::TaskContext;
 use crate::task::processor::{current_task, schedule};
@@ -8,6 +8,7 @@ pub(crate) use crate::task::manager::add_task;
 #[cfg(feature = "sbrk_lazy_alloc")]
 use crate::mm::VirtAddr;
 use crate::trap::context::TrapContext;
+pub(crate) use crate::task::processor::scheduler;
 
 mod switch;
 mod context;
@@ -15,6 +16,11 @@ mod task;
 mod pid;
 mod manager;
 mod processor;
+
+pub fn init() {
+  add_initproc();
+  list_apps();
+}
 
 lazy_static! {
   pub static ref INITPROC: Arc<TaskControlBlock> = Arc::new(
@@ -74,22 +80,6 @@ pub fn exit_current_and_run_next(xcode: i32) -> ! {
 
   panic!("Unreachable in exit_current_and_run_next")
 }
-
-// pub fn run_first_task() {
-//   TASK_MANAGER.run_first_task();
-// }
-//
-// fn mark_current_suspended() {
-//   TASK_MANAGER.mark_current_suspended();
-// }
-//
-// fn mark_current_exited() {
-//   TASK_MANAGER.mark_current_exited();
-// }
-//
-// fn run_next_task() {
-//   TASK_MANAGER.run_next_task();
-// }
 
 pub fn get_current_pid() -> isize {
   get_current_task().get_pid() as isize

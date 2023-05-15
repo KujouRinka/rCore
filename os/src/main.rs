@@ -69,7 +69,8 @@ pub fn rust_main() -> ! {
   trap::enable_timer_interrupt();
   info!("timer interrupt opened");
   timer::set_next_trigger();
-  info!("starting to run first task");
-  // task::run_first_task();
+  task::init();
+  info!("being able to run initproc");
+  task::scheduler();
   panic!("Unreachable in rust_main")
 }

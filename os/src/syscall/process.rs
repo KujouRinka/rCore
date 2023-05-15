@@ -66,7 +66,6 @@ pub fn sys_waitpid(pid: isize, xcode_ptr: *mut i32) -> isize {
 }
 
 pub fn sys_exit(xcode: i32) -> ! {
-  info!("[kernel] Application {} exited with code {}", get_current_pid(), xcode);
   exit_current_and_run_next(xcode)
 }
 

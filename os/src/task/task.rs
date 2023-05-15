@@ -135,15 +135,7 @@ impl TaskControlBlockInner {
       .translate(VirtAddr::from(TRAP_CONTEXT).into())
       .unwrap()
       .ppn();
-    let (kernel_bottom, kernel_top) = kernel_stack_position(pid);
-    unsafe {
-      KERNEL_SPACE.exclusive_access()
-        .insert_framed_area(
-          kernel_bottom.into(),
-          kernel_top.into(),
-          MapPermission::R | MapPermission::W,
-        );
-    }
+    let (_, kernel_top) = kernel_stack_position(pid);
     let tcb = Self {
       task_status: TaskStatus::Ready,
       task_cx: TaskContext::goto_trap_return(kernel_top),
