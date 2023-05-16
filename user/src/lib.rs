@@ -92,3 +92,8 @@ pub fn sleep(period_ms: usize) {
         sys_yield();
     }
 }
+
+pub fn sbrk(size: i32) -> isize {
+    sys_sbrk(size)
+}
+
