@@ -89,7 +89,7 @@ pub fn trap_handler() -> ! {
           false
         }
       } else {
-        match tcb_inner.memory_set.translate(VirtAddr::from(stval).into()) {
+        match tcb_inner.memory_set.translate(VirtAddr::from(stval).floor()) {
           Some(pte) if pte.is_valid() && pte.is_readable() && pte.is_cow_page() => {
             // copy on write
             true
@@ -99,6 +99,7 @@ pub fn trap_handler() -> ! {
           }
         }
       };
+      drop(tcb_inner);
       if !ok {
         warn!("[kernel] PageFault in application, bad addr = {:#x}, bad instruction = {:#x}, kernel killed it.", stval, cx.sepc);
         exit_current_and_run_next(-2);
