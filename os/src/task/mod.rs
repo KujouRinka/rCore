@@ -10,7 +10,7 @@ use lazy_static::lazy_static;
 
 use task::{TaskControlBlock, TaskStatus};
 use context::TaskContext;
-use processor::{current_task, schedule};
+use processor::{current_task, schedule, take_current_task};
 pub(crate) use manager::add_task;
 pub(crate) use processor::scheduler;
 
@@ -47,7 +47,7 @@ pub fn get_current_task() -> Arc<TaskControlBlock> {
 
 // This is same as yield()
 pub fn suspend_current_and_run_next() {
-  let task = get_current_task();
+  let task = take_current_task().unwrap();
   let mut inner = task.inner_borrow_mut();
   inner.task_status = TaskStatus::Ready;
   let task_cx = &mut inner.task_cx as *mut TaskContext;
@@ -58,7 +58,7 @@ pub fn suspend_current_and_run_next() {
 }
 
 pub fn exit_current_and_run_next(xcode: i32) -> ! {
-  let task = get_current_task();
+  let task = take_current_task().unwrap();
   let mut task_inner = task.inner_borrow_mut();
   task_inner.task_status = TaskStatus::Zombie;
   task_inner.xcode = xcode;
@@ -70,6 +70,8 @@ pub fn exit_current_and_run_next(xcode: i32) -> ! {
   }
   drop(initproc_inner);
 
+  // Must drop all ref to children manually.
+  task_inner.children.clear();
   // Manually call this to free all pages
   unsafe {
     task_inner.memory_set.recycle_pages();
