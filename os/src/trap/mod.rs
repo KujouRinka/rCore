@@ -81,6 +81,7 @@ pub fn trap_handler() -> ! {
       let tcb = get_current_tcb_ref();
       let tcb_inner = tcb.inner_borrow();
       let ok = if stval >= tcb_inner.heap_bottom && stval < tcb_inner.program_brk {
+        drop(tcb_inner);
         // lazy allocation for sbrk()
         #[cfg(feature = "sbrk_lazy_alloc")] {
           lazy_alloc_page(stval.into())
@@ -89,7 +90,9 @@ pub fn trap_handler() -> ! {
           false
         }
       } else {
-        match tcb_inner.memory_set.translate(VirtAddr::from(stval).floor()) {
+        let to_match = tcb_inner.memory_set.translate(VirtAddr::from(stval).floor());
+        drop(tcb_inner);
+        match to_match {
           Some(pte) if pte.is_valid() && pte.is_readable() && pte.is_cow_page() => {
             // copy on write
             true
@@ -99,7 +102,6 @@ pub fn trap_handler() -> ! {
           }
         }
       };
-      drop(tcb_inner);
       if !ok {
         warn!("[kernel] PageFault in application, bad addr = {:#x}, bad instruction = {:#x}, kernel killed it.", stval, cx.sepc);
         exit_current_and_run_next(-2);
