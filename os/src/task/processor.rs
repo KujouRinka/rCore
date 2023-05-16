@@ -41,18 +41,17 @@ impl Processor {
   }
 }
 
-#[allow(unused)]
 pub fn take_current_task() -> Option<Arc<TaskControlBlock>> {
   PROCESSOR.borrow_mut().take_current()
 }
 
 pub fn current_task() -> Option<Arc<TaskControlBlock>> {
-  PROCESSOR.borrow_mut().current()
+  PROCESSOR.borrow().current()
 }
 
 #[allow(unused)]
 pub fn current_user_token() -> Option<usize> {
-  PROCESSOR.borrow_mut()
+  PROCESSOR.borrow()
     .current
     .as_ref()
     .map(|x| {

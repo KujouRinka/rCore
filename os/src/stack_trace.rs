@@ -11,7 +11,7 @@ pub unsafe fn print_stack_trace() {
     unsafe {
       let ra = *((cur_fp - 8) as *const usize);
       cur_fp = *((cur_fp - 16) as *const usize);
-      println!("{}: 0x{:016x}, fp=0x{:016x}", cnt, ra, cur_fp);
+      println!("{}: ra=0x{:016x}, fp=0x{:016x}", cnt, ra, cur_fp);
     }
     cnt += 1;
   }

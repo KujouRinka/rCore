@@ -42,9 +42,8 @@ pub fn sys_exec(path: *const u8) -> isize {
 pub fn sys_waitpid(pid: isize, xcode_ptr: *mut i32) -> isize {
   let task = get_current_task();
   let mut task_inner = task.inner_borrow_mut();
-  if task_inner.children.iter()
-    .find(|p| { pid == -1 || pid as usize == p.get_pid() })
-    .is_none() {
+  if !task_inner.children.iter()
+    .any(|p| { pid == -1 || pid as usize == p.get_pid() }) {
     return -1;
   }
   let pair = task_inner.children.iter()
