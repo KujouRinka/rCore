@@ -17,6 +17,7 @@ pub(crate) use processor::scheduler;
 use crate::loader::{get_app_data_by_name, list_apps};
 #[cfg(feature = "sbrk_lazy_alloc")]
 use crate::mm::VirtAddr;
+use crate::sbi::shutdown;
 use crate::trap::context::TrapContext;
 
 pub fn init() {
@@ -57,8 +58,15 @@ pub fn suspend_current_and_run_next() {
   schedule(task_cx);
 }
 
+pub const INITPROC_PID: usize = 0;
+
 pub fn exit_current_and_run_next(xcode: i32) -> ! {
   let task = take_current_task().unwrap();
+  let pid = task.get_pid();
+  if pid == INITPROC_PID {
+    shutdown();
+  }
+
   let mut task_inner = task.inner_borrow_mut();
   task_inner.task_status = TaskStatus::Zombie;
   task_inner.xcode = xcode;

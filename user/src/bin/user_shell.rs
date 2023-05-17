@@ -7,6 +7,7 @@ extern crate alloc;
 #[macro_use]
 extern crate user_lib;
 
+const EOT: u8 = 4;
 const LF: u8 = 0x0au8;
 const CR: u8 = 0x0du8;
 const DL: u8 = 0x7fu8;
@@ -14,7 +15,7 @@ const BS: u8 = 0x08u8;
 
 use alloc::string::String;
 use user_lib::console::getchar;
-use user_lib::{exec, fork, waitpid};
+use user_lib::{exec, exit, fork, waitpid};
 
 #[no_mangle]
 pub fn main() -> i32 {
@@ -54,6 +55,9 @@ pub fn main() -> i32 {
                     print!("{}", BS as char);
                     line.pop();
                 }
+            }
+            EOT => {
+                exit(0);
             }
             _ => {
                 print!("{}", c as char);

@@ -4,7 +4,7 @@
 #[macro_use]
 extern crate user_lib;
 
-use user_lib::{exec, fork, wait, yield_};
+use user_lib::{exec, exit, fork, wait, yield_};
 
 #[no_mangle]
 fn main() -> i32 {
@@ -22,6 +22,9 @@ fn main() -> i32 {
                 "[initproc] Released a zombie process, pid={}, exit_code={}",
                 pid, exit_code,
             );
+            if pid == 1 {
+                exit(0);
+            }
         }
     }
     0
