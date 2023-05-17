@@ -1,4 +1,5 @@
 use core::cell::UnsafeCell;
+use core::fmt;
 use core::ops::{Deref, DerefMut};
 use core::sync::atomic::AtomicU32;
 use core::sync::atomic::Ordering::{Acquire, Relaxed, Release};
@@ -9,7 +10,7 @@ pub struct SpinMutex<T: ?Sized> {
   /// 0: unlocked
   /// 1: locked, no other threads waiting
   /// 2: locked, and other threads waiting (contended)
-  futex: AtomicU32,
+  pub futex: AtomicU32,
   data: UnsafeCell<T>,
 }
 
@@ -34,7 +35,7 @@ impl<T> SpinMutex<T> {
   }
 
   pub fn lock(&self) -> SpinMutexGuard<'_, T> {
-    while let Ok(_) = self.futex.compare_exchange(0, 1, Acquire, Relaxed) {}
+    while let Err(_) = self.futex.compare_exchange(0, 1, Acquire, Relaxed) {}
     unsafe {
       SpinMutexGuard::new(self)
     }
@@ -75,5 +76,17 @@ impl<T: ?Sized> Drop for SpinMutexGuard<'_, T> {
     if self.lock.futex.swap(0, Release) == 0 {
       panic!("SpinMutexGuard was not locked");
     }
+  }
+}
+
+impl<T: ?Sized + fmt::Debug> fmt::Debug for SpinMutexGuard<'_, T> {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fmt::Debug::fmt(&**self, f)
+  }
+}
+
+impl<T: ?Sized + fmt::Display> fmt::Display for SpinMutexGuard<'_, T> {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    (**self).fmt(f)
   }
 }
