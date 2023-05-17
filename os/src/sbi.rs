@@ -26,7 +26,7 @@ pub fn sbi_call(which: usize, arg0: usize, arg1: usize, arg2: usize) -> usize {
   ret
 }
 
-pub fn console_getchat() -> usize {
+pub fn console_getchar() -> usize {
   sbi_call(SBI_CONSOLE_GETCHAR, 0, 0, 0)
 }
 
