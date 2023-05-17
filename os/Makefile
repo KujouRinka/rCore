@@ -13,6 +13,10 @@ SOURCES := $(shell find src -name '*')
 # USER_SOURCES := $(shell find ../user/target/riscv64gc-unknown-none-elf/release -name '*.bin')
 USER_SOURCES := $(shell find ../user/src -name '*')
 
+CPUS := 1
+
+QEMUOPTS := -machine virt -m 128M -bios $(SBI_PATH) -nographic $(DEVICE_PARAM) -smp $(CPUS)
+
 $(KERNEL_BIN): $(KERNEL_ELF)
 	@$(OBJCOPY) $(KERNEL_ELF) --strip-all -O binary $@
 
@@ -31,13 +35,13 @@ $(KERNEL_ELF_DEBUG): $(SOURCES) $(USER_SOURCES)
 	cargo build
 
 run: $(KERNEL_BIN)
-	qemu-system-riscv64 -machine virt -m 128M -bios $(SBI_PATH) -nographic $(DEVICE_PARAM)
+	qemu-system-riscv64 $(QEMUOPTS)
 
 run-debug: $(KERNEL_BIN_DEBUG)
-	qemu-system-riscv64 -machine virt -m 128M -bios $(SBI_PATH) -nographic $(DEVICE_PARAM)
+	qemu-system-riscv64 $(QEMUOPTS)
 
 run-gdb: $(KERNEL_BIN_DEBUG)
-	qemu-system-riscv64 -machine virt -m 128M -bios $(SBI_PATH) -nographic $(DEVICE_PARAM) -s -S
+	qemu-system-riscv64 $(QEMUOPTS) -s -S
 
 clean:
 	cargo clean
