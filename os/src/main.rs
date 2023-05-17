@@ -23,10 +23,12 @@ mod task;
 mod timer;
 mod mm;
 mod vars;
+mod common;
 
-use core::arch::global_asm;
+use core::arch::{asm, global_asm};
 use log::{info, LevelFilter};
 use vars::*;
+use crate::common::r_tp;
 
 global_asm!(include_str!("entry.asm"));
 global_asm!(include_str!("link_app.S"));
@@ -38,39 +40,51 @@ pub fn clear_bss() {
 }
 
 #[no_mangle]
-pub fn rust_main() -> ! {
-  clear_bss();
-  logging::init(LevelFilter::Trace.into());
-  info!("bss cleaned");
-  mm::init();
-  info!("mm inited");
-  mm::test();
-  println!("hello world");
-  info!(
+pub fn rust_main(hartid: usize, _dtb: usize) -> ! {
+  // save hartid to tp register
+  unsafe {
+    asm!(
+    "mv tp, {0}",
+    in(reg) hartid,
+    );
+  }
+  if r_tp() == 0 {
+    println!("hartid: {}", r_tp());
+    clear_bss();
+    logging::init(LevelFilter::Trace.into());
+    info!("bss cleaned");
+    mm::init();
+    info!("mm inited");
+    mm::test();
+    info!(
         "[kernel] .text [{:#x}, {:#x})",
         stext as usize,
         etext as usize
     );
-  info!(
+    info!(
         "[kernel] .rodata [{:#x}, {:#x})",
         srodata as usize, erodata as usize
     );
-  info!(
+    info!(
         "[kernel] .data [{:#x}, {:#x})",
         sdata as usize, edata as usize
     );
-  info!(
+    info!(
         "[kernel] boot_stack top=bottom={:#x}, lower_bound={:#x}",
         boot_stack_top as usize, boot_stack_lower_bound as usize
     );
-  info!("[kernel] .bss [{:#x}, {:#x})", sbss as usize, ebss as usize);
-  trap::init();
-  info!("trap inited");
-  trap::enable_timer_interrupt();
-  info!("timer interrupt opened");
-  timer::set_next_trigger();
-  task::init();
-  info!("being able to run initproc");
-  task::scheduler();
-  panic!("Unreachable in rust_main")
+    info!("[kernel] .bss [{:#x}, {:#x})", sbss as usize, ebss as usize);
+    trap::init();
+    info!("trap inited");
+    trap::enable_timer_interrupt();
+    info!("timer interrupt opened");
+    timer::set_next_trigger();
+    task::init();
+    info!("being able to run initproc");
+    task::scheduler();
+    panic!("Unreachable in rust_main")
+  } else {
+    // TODO:
+    loop {}
+  }
 }
