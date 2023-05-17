@@ -5,7 +5,7 @@ use bitflags::*;
 use crate::config::{PAGE_SIZE, PTE_FLAGS_BITS};
 use crate::mm::{
   address::{PhysPageNum, VirtPageNum},
-  frame_allocator::{frame_alloc, FrameTracker, FrameTrackerMarker},
+  frame_allocator::{frame_alloc, FrameTracker},
   {PhysAddr, VirtAddr},
 };
 
@@ -206,10 +206,9 @@ impl PageTable {
     };
     *pte = PageTableEntry::empty();
     if args.dealloc {
-      // TODO: release record in self.frames
-      let dummy_key = FrameTrackerMarker::new(pte.ppn());
-      let key_to_remove = dummy_key.frame_tracker_ref();
+      let key_to_remove = FrameTracker { ppn: pte.ppn() };
       self.frames_holder.remove(&key_to_remove);
+      core::mem::forget(key_to_remove);
     }
   }
 
