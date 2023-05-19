@@ -8,6 +8,7 @@ pub struct UPSafeCell<T> {
 
 unsafe impl<T> Sync for UPSafeCell<T> {}
 
+#[allow(unused)]
 impl<T> UPSafeCell<T> {
   pub unsafe fn new(value: T) -> Self {
     Self {

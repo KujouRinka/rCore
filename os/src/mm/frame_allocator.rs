@@ -4,8 +4,8 @@ use core::marker::PhantomData;
 use lazy_static::lazy_static;
 use log::trace;
 use crate::config::MEMORY_END;
+use crate::sync::SpinMutex;
 use crate::mm::address::{PhysAddr, PhysPageNum};
-use crate::sync::UPSafeCell;
 use crate::vars::*;
 
 trait FrameAllocator {
@@ -61,13 +61,12 @@ impl FrameAllocator for StackFrameAllocator {
 
 type FrameAllocatorImpl = StackFrameAllocator;
 lazy_static! {
-  pub static ref FRAME_ALLOCATOR: UPSafeCell<FrameAllocatorImpl> = unsafe {
-    UPSafeCell::new(FrameAllocatorImpl::new())
-  };
+  pub static ref FRAME_ALLOCATOR: SpinMutex<FrameAllocatorImpl> =
+    SpinMutex::new(FrameAllocatorImpl::new());
 }
 
 pub fn init_frame_allocator() {
-  FRAME_ALLOCATOR.borrow_mut()
+  FRAME_ALLOCATOR.lock()
     .init(
       PhysAddr::from(ekernel as usize).ceil(),
       PhysAddr::from(MEMORY_END).floor(),
@@ -119,14 +118,14 @@ impl Drop for FrameTracker {
 
 pub fn frame_alloc() -> Option<FrameTracker> {
   FRAME_ALLOCATOR
-    .borrow_mut()
+    .lock()
     .alloc()
     .map(FrameTracker::new)
 }
 
 pub fn frame_dealloc(ppn: PhysPageNum) {
   FRAME_ALLOCATOR
-    .borrow_mut()
+    .lock()
     .dealloc(ppn);
 }
 

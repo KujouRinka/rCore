@@ -1,5 +1,3 @@
-use log::trace;
-
 mod heap_allocator;
 mod address;
 mod page_table;
@@ -13,11 +11,8 @@ pub use page_table::{translated_byte_buffer, translated_str, translated_copyout,
 
 pub fn init() {
   heap_allocator::init_heap();
-  trace!("heap_allocator inited");
   frame_allocator::init_frame_allocator();
-  trace!("frame_allocator inited");
-  KERNEL_SPACE.borrow_mut().activate();
-  trace!("kernel_space inited");
+  KERNEL_SPACE.lock().activate();
 }
 
 #[allow(unused)]

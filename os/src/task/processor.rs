@@ -1,6 +1,10 @@
+use alloc::vec::Vec;
 use alloc::sync::Arc;
+use core::cell::RefCell;
+use core::ops::Index;
 use lazy_static::lazy_static;
-use crate::sync::UPSafeCell;
+use crate::common::cpuid;
+use crate::config::MAX_CPU_NUM;
 use crate::task::{
   context::TaskContext,
   manager::fetch_task,
@@ -9,9 +13,25 @@ use crate::task::{
 };
 use crate::trap::context::TrapContext;
 
+pub struct Processors {
+  processors: Vec<RefCell<Processor>>,
+}
+
+unsafe impl Sync for Processors {}
+
+impl Index<usize> for Processors {
+  type Output = RefCell<Processor>;
+
+  fn index(&self, index: usize) -> &Self::Output {
+    &self.processors[index]
+  }
+}
+
 lazy_static! {
-  pub static ref PROCESSOR: UPSafeCell<Processor> = unsafe {
-    UPSafeCell::new(Processor::new())
+  pub static ref PROCESSOR: Processors = Processors {
+    processors: {
+      (0..MAX_CPU_NUM).map(|_| RefCell::new(Processor::new())).collect()
+    },
   };
 }
 
@@ -42,16 +62,16 @@ impl Processor {
 }
 
 pub fn take_current_task() -> Option<Arc<TaskControlBlock>> {
-  PROCESSOR.borrow_mut().take_current()
+  PROCESSOR[cpuid()].borrow_mut().take_current()
 }
 
 pub fn current_task() -> Option<Arc<TaskControlBlock>> {
-  PROCESSOR.borrow().current()
+  PROCESSOR[cpuid()].borrow().current()
 }
 
 #[allow(unused)]
 pub fn current_user_token() -> Option<usize> {
-  PROCESSOR.borrow()
+  PROCESSOR[cpuid()].borrow()
     .current
     .as_ref()
     .map(|x| {
@@ -67,7 +87,7 @@ pub fn current_trap_cx() -> Option<&'static mut TrapContext> {
 }
 
 pub fn schedule(switched_task_cx_ptr: *mut TaskContext) {
-  let mut processor = PROCESSOR.borrow_mut();
+  let mut processor = PROCESSOR[cpuid()].borrow_mut();
   let this_cpu_scheduler_cx = processor.get_scheduler_cx_mut_ptr();
   drop(processor);
   unsafe {
@@ -80,7 +100,7 @@ pub fn schedule(switched_task_cx_ptr: *mut TaskContext) {
 
 pub fn scheduler() {
   loop {
-    let mut processor = PROCESSOR.borrow_mut();
+    let mut processor = PROCESSOR[cpuid()].borrow_mut();
     if let Some(next_task) = fetch_task() {
       let this_scheduler_cx = processor.get_scheduler_cx_mut_ptr();
       let mut next_task_inner = next_task.inner_borrow_mut();

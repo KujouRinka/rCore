@@ -136,5 +136,27 @@ pub fn trap_return() -> ! {
 
 #[no_mangle]
 pub fn trap_from_kernel() -> ! {
+  let scause = scause::read();
+  let stval = stval::read();
+  match scause.cause() {
+    Trap::Exception(Exception::UserEnvCall) => {
+      // syscall
+      warn!("a syscall from kernel!");
+    }
+    Trap::Exception(Exception::StoreFault)
+    | Trap::Exception(Exception::StorePageFault)
+    | Trap::Exception(Exception::LoadFault)
+    | Trap::Exception(Exception::LoadPageFault) => {
+      warn!("a page fault from kernel!");
+      warn!("Unsupported trap {:?}, stval = {:#x}", scause.cause(), stval);
+    }
+    Trap::Exception(Exception::IllegalInstruction) => {
+      warn!("a illegal instruction from kernel!");
+    }
+    Trap::Interrupt(Interrupt::SupervisorTimer) => {
+      warn!("a timer interrupt from kernel!");
+    }
+    _ => {}
+  }
   panic!("a trap from kernel!");
 }

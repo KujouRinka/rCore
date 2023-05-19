@@ -1,11 +1,10 @@
 use alloc::sync::{Weak, Arc};
 use alloc::vec::Vec;
-use core::cell::{Ref, RefMut};
 use core::ptr;
 use cfg_if::cfg_if;
 use crate::config::*;
 use crate::mm::{KERNEL_SPACE, MapPermission, MemorySet, PhysPageNum, VirtAddr};
-use crate::sync::UPSafeCell;
+use crate::sync::{SpinMutex, SpinMutexGuard};
 use crate::task::{
   context::TaskContext,
   pid::{kernel_stack_position, KernelStack, pid_alloc, PidHandle},
@@ -26,7 +25,7 @@ pub struct TaskControlBlock {
   pub pid: PidHandle,
   pub kernel_stack: KernelStack,
   // mutable
-  inner: UPSafeCell<TaskControlBlockInner>,
+  inner: SpinMutex<TaskControlBlockInner>,
 }
 
 impl TaskControlBlock {
@@ -34,7 +33,7 @@ impl TaskControlBlock {
   pub fn new_for_initproc(elf_data: &[u8]) -> Self {
     let pid = pid_alloc();
     let kernel_stack = KernelStack::new(&pid);
-    let inner = unsafe { UPSafeCell::new(TaskControlBlockInner::new(elf_data, pid.0)) };
+    let inner = SpinMutex::new(TaskControlBlockInner::new(elf_data, pid.0));
     Self {
       pid,
       kernel_stack,
@@ -47,7 +46,7 @@ impl TaskControlBlock {
 
     let trap_cx_ppn = memory_set.translate(VirtAddr::from(TRAP_CONTEXT).into()).unwrap().ppn();
 
-    let mut inner = self.inner.borrow_mut();
+    let mut inner = self.inner.lock();
     inner.trap_cx_ppn = trap_cx_ppn;
     inner.memory_set = memory_set;
 
@@ -55,7 +54,7 @@ impl TaskControlBlock {
     *trap_cx = TrapContext::app_init_context(
       entry_point,
       user_stack_top,
-      KERNEL_SPACE.borrow_mut().token(),
+      KERNEL_SPACE.lock().token(),
       self.kernel_stack.get_top(),
       trap_handler as usize,
     );
@@ -84,7 +83,7 @@ impl TaskControlBlock {
     let new_tcb = TaskControlBlock {
       pid,
       kernel_stack,
-      inner: unsafe { UPSafeCell::new(tcb_inner) },
+      inner: SpinMutex::new(tcb_inner),
     };
     new_tcb.inner_borrow_mut().get_trap_cx().kernel_sp = kernel_stack_top;
     let ret = Arc::new(new_tcb);
@@ -92,12 +91,12 @@ impl TaskControlBlock {
     ret
   }
 
-  pub fn inner_borrow(&self) -> Ref<'_, TaskControlBlockInner> {
-    self.inner.borrow()
+  pub fn inner_borrow(&self) -> SpinMutexGuard<'_, TaskControlBlockInner> {
+    self.inner.lock()
   }
 
-  pub fn inner_borrow_mut(&self) -> RefMut<'_, TaskControlBlockInner> {
-    self.inner.borrow_mut()
+  pub fn inner_borrow_mut(&self) -> SpinMutexGuard<'_, TaskControlBlockInner> {
+    self.inner.lock()
   }
 
   pub fn get_pid(&self) -> usize {
@@ -153,7 +152,7 @@ impl TaskControlBlockInner {
     let to_write_cx = TrapContext::app_init_context(
       entry_point,
       user_stack_top,
-      KERNEL_SPACE.borrow_mut().token(),
+      KERNEL_SPACE.lock().token(),
       kernel_top,
       trap_handler as usize,
     );

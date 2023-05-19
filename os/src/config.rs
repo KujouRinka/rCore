@@ -15,3 +15,7 @@ pub const TRAP_CONTEXT: usize = TRAMPOLINE - PAGE_SIZE;
 
 pub const MEMORY_END: usize = 0x88000000;  // 128M
 // pub const MEMORY_END: usize = 0x80800000;     // 8M
+
+// multicore
+// max number of CPUs
+pub const MAX_CPU_NUM: usize = 8;

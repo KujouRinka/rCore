@@ -7,3 +7,7 @@ pub fn r_tp() -> usize {
   }
   tp
 }
+
+pub fn cpuid() -> usize {
+  r_tp()
+}
