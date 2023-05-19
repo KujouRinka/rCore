@@ -1,6 +1,7 @@
 #![feature(panic_info_message)]
 #![feature(alloc_error_handler)]
 #![feature(stmt_expr_attributes)]
+#![feature(negative_impls)]
 #![no_std]
 #![no_main]
 
@@ -26,9 +27,12 @@ mod vars;
 mod common;
 
 use core::arch::{asm, global_asm};
+use core::sync::atomic::AtomicU32;
+use core::sync::atomic::Ordering;
 use log::{info, LevelFilter};
 use vars::*;
 use crate::common::r_tp;
+use crate::mm::KERNEL_SPACE;
 
 global_asm!(include_str!("entry.asm"));
 global_asm!(include_str!("link_app.S"));
@@ -39,17 +43,12 @@ pub fn clear_bss() {
   });
 }
 
+static STARTED: AtomicU32 = AtomicU32::new(0);
+
 #[no_mangle]
 pub fn rust_main(hartid: usize, _dtb: usize) -> ! {
-  // save hartid to tp register
-  unsafe {
-    asm!(
-    "mv tp, {0}",
-    in(reg) hartid,
-    );
-  }
+  save_hartid_to_tp(hartid);
   if r_tp() == 0 {
-    println!("hartid: {}", r_tp());
     clear_bss();
     logging::init(LevelFilter::Trace.into());
     info!("bss cleaned");
@@ -81,10 +80,24 @@ pub fn rust_main(hartid: usize, _dtb: usize) -> ! {
     timer::set_next_trigger();
     task::init();
     info!("being able to run initproc");
-    task::scheduler();
-    panic!("Unreachable in rust_main")
+    STARTED.store(1, Ordering::Release);
   } else {
-    // TODO:
-    loop {}
+    while STARTED.load(Ordering::Acquire) == 0 {}
+    println!("hartid {} starting", r_tp());
+    KERNEL_SPACE.lock().activate();
+    trap::init();
+    trap::enable_timer_interrupt();
+    timer::set_next_trigger();
+  }
+  task::scheduler();
+  panic!("Unreachable in rust_main")
+}
+
+fn save_hartid_to_tp(hartid: usize) {
+  unsafe {
+    asm!(
+    "mv tp, {0}",
+    in(reg) hartid,
+    );
   }
 }
