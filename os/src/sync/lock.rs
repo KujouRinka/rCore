@@ -1,16 +1,13 @@
 use core::cell::UnsafeCell;
 use core::fmt;
 use core::ops::{Deref, DerefMut};
-use core::sync::atomic::AtomicU32;
+use core::sync::atomic::AtomicBool;
 use core::sync::atomic::Ordering::{Acquire, Relaxed, Release};
 
-pub struct Spinlock {}
-
 pub struct SpinMutex<T: ?Sized> {
-  /// 0: unlocked
-  /// 1: locked, no other threads waiting
-  /// 2: locked, and other threads waiting (contended)
-  pub futex: AtomicU32,
+  /// false: unlocked
+  /// true: locked
+  futex: AtomicBool,
   data: UnsafeCell<T>,
 }
 
@@ -29,18 +26,19 @@ unsafe impl<T: ?Sized + Sync> Sync for SpinMutexGuard<'_, T> {}
 impl<T> SpinMutex<T> {
   pub const fn new(t: T) -> Self {
     Self {
-      futex: AtomicU32::new(0),
+      futex: AtomicBool::new(false),
       data: UnsafeCell::new(t),
     }
   }
 
   pub fn lock(&self) -> SpinMutexGuard<'_, T> {
-    while let Err(_) = self.futex.compare_exchange(0, 1, Acquire, Relaxed) {}
+    while let Err(_) = self.futex.compare_exchange(false, true, Acquire, Relaxed) {}
     unsafe {
       SpinMutexGuard::new(self)
     }
   }
 
+  #[allow(unused)]
   pub fn unlock(guard: SpinMutexGuard<'_, T>) {
     drop(guard);
   }
@@ -73,7 +71,7 @@ impl<T: ?Sized> DerefMut for SpinMutexGuard<'_, T> {
 
 impl<T: ?Sized> Drop for SpinMutexGuard<'_, T> {
   fn drop(&mut self) {
-    if self.lock.futex.swap(0, Release) == 0 {
+    if self.lock.futex.swap(false, Release) == false {
       panic!("SpinMutexGuard was not locked");
     }
   }
