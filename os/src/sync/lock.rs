@@ -73,7 +73,7 @@ impl<T> SpinMutex<T> {
   pub fn lock(&self) -> SpinMutexGuard<'_, T> {
     push_off();
     if self.holding() {
-      panic!("SpinLock was locked by current thread");
+      panic!("SpinMutex was locked by current thread");
     }
     while let Err(_) = self.futex.compare_exchange(false, true, Acquire, Relaxed) {}
     self.cpu.set(r_tp() as isize);
