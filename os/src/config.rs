@@ -5,7 +5,7 @@ pub const KERNEL_STACK_SIZE: usize = 1 << 13;
 pub const CLOCK_FREQ: usize = 12500000;
 
 // mm
-pub const KERNEL_HEAP_SIZE: usize = 0x30_0000;
+pub const KERNEL_HEAP_SIZE: usize = 0x80_0000;
 pub const PAGE_SIZE_BITS: usize = 0xc;
 pub const PAGE_SIZE: usize = 1 << PAGE_SIZE_BITS;   // 4k
 pub const PTE_FLAGS_BITS: usize = 0xa;
