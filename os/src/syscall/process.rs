@@ -3,8 +3,8 @@ use crate::loader::get_app_data_by_name;
 use crate::mm::{translated_str, translated_copyout};
 use crate::task::{
   get_current_task,
-  suspend_current_and_run_next,
-  exit_current_and_run_next,
+  yield_,
+  exit,
   get_current_pid,
   get_current_token,
   change_program_brk,
@@ -19,7 +19,8 @@ pub fn sys_getpid() -> isize {
 pub fn sys_fork() -> isize {
   let forking_task = get_current_task().fork();
   let child_pid = forking_task.pid.0;
-  let trap_cx = forking_task.inner_borrow_mut().get_trap_cx();
+  let forking_task_inner = forking_task.inner_borrow_ptr();
+  let trap_cx = forking_task_inner.get_trap_cx();
 
   // set a0 register as 0 for return value for child proc
   trap_cx.regs[10] = 0;
@@ -41,30 +42,49 @@ pub fn sys_exec(path: *const u8) -> isize {
 
 pub fn sys_waitpid(pid: isize, xcode_ptr: *mut i32) -> isize {
   let task = get_current_task();
-  let mut task_inner = task.inner_borrow_mut();
+  task.lock();
+  let task_inner = task.inner_borrow_ptr_mut();
   if !task_inner.children.iter()
-    .any(|p| { pid == -1 || pid as usize == p.get_pid() }) {
+    .any(|p| {
+      let ret = pid == -1 || pid as usize == p.get_pid();
+      ret
+    }) {
+    task.unlock();
     return -1;
   }
   let pair = task_inner.children.iter()
     .enumerate()
     .find(|(_, p)| {
-      p.inner_borrow().is_zombie() && (pid == -1 || pid as usize == p.get_pid())
+      p.lock();
+      let ret = p.inner_borrow_ptr().is_zombie() && (pid == -1 || pid as usize == p.get_pid());
+      if !ret {
+        p.unlock();
+      }
+      ret
     });
   if let Some((idx, _)) = pair {
     let child = task_inner.children.remove(idx);
     assert_eq!(Arc::strong_count(&child), 1);
+
     let found_pid = child.get_pid();
-    let xcode = child.inner_borrow().xcode;
+    let child_inner = child.inner_borrow_ptr();
+    let xcode = child_inner.xcode;
+
     translated_copyout(task_inner.get_user_token(), xcode_ptr, xcode);
+
+    child.unlock();
+    drop(child);
+
+    task.unlock();
     found_pid as isize
   } else {
+    task.unlock();
     -2
   }
 }
 
 pub fn sys_exit(xcode: i32) -> ! {
-  exit_current_and_run_next(xcode)
+  exit(xcode)
 }
 
 pub fn sys_get_taskinfo() -> isize {
@@ -72,7 +92,7 @@ pub fn sys_get_taskinfo() -> isize {
 }
 
 pub fn sys_yield() -> isize {
-  suspend_current_and_run_next();
+  yield_();
   0
 }
 

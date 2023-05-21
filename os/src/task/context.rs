@@ -1,4 +1,4 @@
-use crate::trap::trap_return;
+use crate::trap::fork_ret;
 
 #[derive(Copy, Clone)]
 #[repr(C)]
@@ -17,9 +17,9 @@ impl TaskContext {
     }
   }
 
-  pub fn goto_trap_return(kstack_ptr: usize) -> Self {
+  pub fn goto_forkret(kstack_ptr: usize) -> Self {
     Self {
-      ra: trap_return as usize,
+      ra: fork_ret as usize,
       sp: kstack_ptr,
       regs: [0; 12],
     }

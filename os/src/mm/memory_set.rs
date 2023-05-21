@@ -14,12 +14,12 @@ use crate::mm::{
   page_table::{MapArgs, PageTable, PTEFlags, UnmapArgs},
 };
 
-use crate::sync::UPSafeCell;
+use crate::sync::SpinMutex;
 use crate::vars::*;
 
 lazy_static! {
-  pub static ref KERNEL_SPACE: Arc<UPSafeCell<MemorySet>> =
-    Arc::new(unsafe { UPSafeCell::new(MemorySet::new_kernel()) });
+  pub static ref KERNEL_SPACE: Arc<SpinMutex<MemorySet>> =
+    Arc::new(SpinMutex::new(MemorySet::new_kernel()));
 }
 
 pub struct MemorySet {
@@ -454,7 +454,7 @@ impl MapArea {
 
 #[allow(unused)]
 pub fn remap_test() {
-  let mut kernel_space = KERNEL_SPACE.borrow_mut();
+  let mut kernel_space = KERNEL_SPACE.lock();
   let mid_text: VirtAddr = ((stext as usize + etext as usize) / 2).into();
   let mid_rodata: VirtAddr = ((srodata as usize + erodata as usize) / 2).into();
   let mid_data: VirtAddr = ((sdata as usize + edata as usize) / 2).into();
