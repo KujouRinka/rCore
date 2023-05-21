@@ -4,7 +4,7 @@ mod process;
 use log::error;
 use fs::*;
 use process::*;
-use crate::task::exit_current_and_run_next;
+use crate::task::exit;
 
 const SYSCALL_READ: usize = 63;
 const SYSCALL_WRITE: usize = 64;
@@ -36,7 +36,7 @@ pub fn syscall(which: usize, args: [usize; 3]) -> isize {
     SYSCALL_GET_TASKINFO => sys_get_taskinfo(),
     _ => {
       error!("Unsupported syscall: {}", which);
-      exit_current_and_run_next(-1)
-    },
+      exit(-1)
+    }
   }
 }

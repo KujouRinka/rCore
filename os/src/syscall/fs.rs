@@ -1,7 +1,7 @@
 use crate::mm::translated_byte_buffer;
 use crate::print;
 use crate::sbi::console_getchar;
-use crate::task::{get_current_token, suspend_current_and_run_next};
+use crate::task::{get_current_token, yield_};
 
 const FD_STDIN: usize = 0;
 const FD_STDOUT: usize = 1;
@@ -14,7 +14,7 @@ pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
       loop {
         c = console_getchar();
         if c == 0 {
-          suspend_current_and_run_next();
+          yield_();
           continue;
         } else {
           break;

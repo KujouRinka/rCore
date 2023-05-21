@@ -3,7 +3,7 @@
 use core::cell::{Ref, RefCell, RefMut};
 
 pub struct UPSafeCell<T> {
-  inner: RefCell<T>
+  inner: RefCell<T>,
 }
 
 unsafe impl<T> Sync for UPSafeCell<T> {}
@@ -16,13 +16,15 @@ impl<T> UPSafeCell<T> {
     }
   }
 
-  // pub fn borrow_mut(&self) -> RefMut<'_, T> {
-  //   self.inner.borrow_mut()
-  // }
+  #[allow(unused)]
+  pub fn borrow_mut(&self) -> RefMut<'_, T> {
+    self.inner.borrow_mut()
+  }
 
-  // pub fn borrow(&self) -> Ref<'_, T> {
-  //   self.inner.borrow()
-  // }
+  #[allow(unused)]
+  pub fn borrow(&self) -> Ref<'_, T> {
+    self.inner.borrow()
+  }
 
   pub fn borrow_ptr_mut(&self) -> &'static mut T {
     unsafe { &mut *self.inner.as_ptr() }

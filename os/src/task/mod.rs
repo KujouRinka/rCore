@@ -7,12 +7,12 @@ mod processor;
 
 use alloc::sync::Arc;
 use lazy_static::lazy_static;
+use log::info;
 
 use task::{TaskControlBlock, TaskStatus};
-use context::TaskContext;
-use processor::{current_task, schedule, take_current_task};
+use processor::{schedule, take_current_task};
 pub(crate) use manager::add_task;
-pub(crate) use processor::scheduler;
+pub(crate) use processor::{current_task, scheduler, current_cpu};
 
 use crate::loader::{get_app_data_by_name, list_apps};
 #[cfg(feature = "sbrk_lazy_alloc")]
@@ -22,6 +22,7 @@ use crate::trap::context::TrapContext;
 
 pub fn init() {
   add_initproc();
+  info!("initproc created and loaded");
   list_apps();
 }
 
@@ -47,50 +48,52 @@ pub fn get_current_task() -> Arc<TaskControlBlock> {
 }
 
 // This is same as yield()
-pub fn suspend_current_and_run_next() {
-  let task = take_current_task().unwrap();
-  let mut inner = task.inner_borrow_mut();
-  inner.task_status = TaskStatus::Ready;
-  let task_cx = &mut inner.task_cx as *mut TaskContext;
-
-  drop(inner);
-  add_task(task);
-  schedule(task_cx);
+pub fn yield_() {
+  let task = get_current_task();
+  task.lock();
+  let mu = task.get_mutex();
+  schedule();
+  mu.unlock();
 }
 
 pub const INITPROC_PID: usize = 0;
 
-pub fn exit_current_and_run_next(xcode: i32) -> ! {
+pub fn exit(xcode: i32) -> ! {
   let task = take_current_task().unwrap();
   let pid = task.get_pid();
   if pid == INITPROC_PID {
     shutdown();
   }
+  let mut task_inner = task.inner_borrow_ptr_mut();
 
-  let mut task_inner = task.inner_borrow_mut();
+
+  INITPROC.lock();
+  task.lock();
+
+  let initproc_inner = INITPROC.inner_borrow_ptr_mut();
+  for child in task_inner.children.iter() {
+    child.lock();
+    let child_inner = child.inner_borrow_ptr_mut();
+    child_inner.parent = Some(Arc::downgrade(&INITPROC));
+    initproc_inner.children.push(Arc::clone(child));
+    child.unlock();
+  }
+
   task_inner.task_status = TaskStatus::Zombie;
   task_inner.xcode = xcode;
-
-  let mut initproc_inner = INITPROC.inner_borrow_mut();
-  for child in task_inner.children.iter() {
-    child.inner_borrow_mut().parent = Some(Arc::downgrade(&INITPROC));
-    initproc_inner.children.push(Arc::clone(child));
-  }
-  drop(initproc_inner);
-
   // Must drop all ref to children manually.
   task_inner.children.clear();
   // Manually call this to free all pages
   unsafe {
     task_inner.memory_set.recycle_pages();
   }
-  drop(task_inner);
+
   drop(task);
+  INITPROC.unlock();
 
-  let mut dummy = TaskContext::zero_init();
-  schedule(&mut dummy as *mut _);
+  schedule();
 
-  panic!("Unreachable in exit_current_and_run_next")
+  panic!("Unreachable in exit()")
 }
 
 pub fn get_current_pid() -> isize {
@@ -98,11 +101,11 @@ pub fn get_current_pid() -> isize {
 }
 
 pub fn get_current_token() -> usize {
-  get_current_task().inner_borrow().get_user_token()
+  get_current_task().inner_borrow_ptr().get_user_token()
 }
 
 pub fn get_current_trap_cx() -> &'static mut TrapContext {
-  get_current_task().inner_borrow().get_trap_cx()
+  get_current_task().inner_borrow_ptr().get_trap_cx()
 }
 
 pub fn get_current_tcb_ref() -> &'static TaskControlBlock {

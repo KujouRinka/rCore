@@ -1,10 +1,11 @@
 use alloc::sync::{Weak, Arc};
 use alloc::vec::Vec;
+use core::cell::{Ref, RefMut};
 use core::ptr;
 use cfg_if::cfg_if;
 use crate::config::*;
 use crate::mm::{KERNEL_SPACE, MapPermission, MemorySet, PhysPageNum, VirtAddr};
-use crate::sync::{SpinMutex, SpinMutexGuard};
+use crate::sync::{SpinLock, UPSafeCell};
 use crate::task::{
   context::TaskContext,
   pid::{kernel_stack_position, KernelStack, pid_alloc, PidHandle},
@@ -21,11 +22,13 @@ pub enum TaskStatus {
 }
 
 pub struct TaskControlBlock {
+  // lock
+  mutex: SpinLock,
   // immutable
   pub pid: PidHandle,
   pub kernel_stack: KernelStack,
   // mutable
-  inner: SpinMutex<TaskControlBlockInner>,
+  inner: UPSafeCell<TaskControlBlockInner>,
 }
 
 impl TaskControlBlock {
@@ -33,8 +36,9 @@ impl TaskControlBlock {
   pub fn new_for_initproc(elf_data: &[u8]) -> Self {
     let pid = pid_alloc();
     let kernel_stack = KernelStack::new(&pid);
-    let inner = SpinMutex::new(TaskControlBlockInner::new(elf_data, pid.0));
+    let inner = unsafe { UPSafeCell::new(TaskControlBlockInner::new(elf_data, pid.0)) };
     Self {
+      mutex: SpinLock::new(),
       pid,
       kernel_stack,
       inner,
@@ -46,7 +50,7 @@ impl TaskControlBlock {
 
     let trap_cx_ppn = memory_set.translate(VirtAddr::from(TRAP_CONTEXT).into()).unwrap().ppn();
 
-    let mut inner = self.inner.lock();
+    let mut inner = self.inner.borrow_ptr_mut();
     inner.trap_cx_ppn = trap_cx_ppn;
     inner.memory_set = memory_set;
 
@@ -64,14 +68,14 @@ impl TaskControlBlock {
     let pid = pid_alloc();
     let kernel_stack = KernelStack::new(&pid);
 
-    let mut parent_inner = self.inner_borrow_mut();
+    let parent_inner = self.inner_borrow_ptr_mut();
     let memory_set = MemorySet::from_another(&parent_inner.memory_set);
     let trap_cx_ppn = memory_set.translate(VirtAddr::from(TRAP_CONTEXT).into()).unwrap().ppn();
     let kernel_stack_top = kernel_stack.get_top();
 
     let tcb_inner = TaskControlBlockInner {
       task_status: TaskStatus::Ready,
-      task_cx: TaskContext::goto_trap_return(kernel_stack_top),
+      task_cx: TaskContext::goto_forkret(kernel_stack_top),
       memory_set,
       trap_cx_ppn,
       heap_bottom: parent_inner.heap_bottom,
@@ -81,22 +85,33 @@ impl TaskControlBlock {
       xcode: 0,
     };
     let new_tcb = TaskControlBlock {
+      mutex: SpinLock::new(),
       pid,
       kernel_stack,
-      inner: SpinMutex::new(tcb_inner),
+      inner: unsafe { UPSafeCell::new(tcb_inner) },
     };
-    new_tcb.inner_borrow_mut().get_trap_cx().kernel_sp = kernel_stack_top;
+    new_tcb.inner_borrow_ptr_mut().get_trap_cx().kernel_sp = kernel_stack_top;
     let ret = Arc::new(new_tcb);
     parent_inner.children.push(Arc::clone(&ret));
     ret
   }
 
-  pub fn inner_borrow(&self) -> SpinMutexGuard<'_, TaskControlBlockInner> {
-    self.inner.lock()
+  #[allow(unused)]
+  pub fn inner_borrow(&self) -> Ref<'_, TaskControlBlockInner> {
+    self.inner.borrow()
   }
 
-  pub fn inner_borrow_mut(&self) -> SpinMutexGuard<'_, TaskControlBlockInner> {
-    self.inner.lock()
+  #[allow(unused)]
+  pub fn inner_borrow_mut(&self) -> RefMut<'_, TaskControlBlockInner> {
+    self.inner.borrow_mut()
+  }
+
+  pub fn inner_borrow_ptr(&self) -> &'static TaskControlBlockInner {
+    self.inner.borrow_ptr()
+  }
+
+  pub fn inner_borrow_ptr_mut(&self) -> &'static mut TaskControlBlockInner {
+    self.inner.borrow_ptr_mut()
   }
 
   pub fn get_pid(&self) -> usize {
@@ -104,12 +119,26 @@ impl TaskControlBlock {
   }
 
   pub fn change_brk(&self, size: i32) -> Option<usize> {
-    self.inner_borrow_mut().change_brk(size)
+    self.inner_borrow_ptr_mut().change_brk(size)
   }
 
   #[cfg(feature = "sbrk_lazy_alloc")]
   pub fn lazy_alloc_page(&self, addr: VirtAddr) -> bool {
-    self.inner_borrow_mut().lazy_alloc_page(addr)
+    self.inner_borrow_ptr_mut().lazy_alloc_page(addr)
+  }
+}
+
+impl TaskControlBlock {
+  pub fn get_mutex(&self) -> &'static SpinLock {
+    unsafe { core::mem::transmute(&self.mutex) }
+  }
+
+  pub fn lock(&self) {
+    self.mutex.lock();
+  }
+
+  pub fn unlock(&self) {
+    self.mutex.unlock();
   }
 }
 
@@ -139,7 +168,7 @@ impl TaskControlBlockInner {
     let (_, kernel_top) = kernel_stack_position(pid);
     let tcb = Self {
       task_status: TaskStatus::Ready,
-      task_cx: TaskContext::goto_trap_return(kernel_top),
+      task_cx: TaskContext::goto_forkret(kernel_top),
       memory_set,
       trap_cx_ppn,
       heap_bottom,

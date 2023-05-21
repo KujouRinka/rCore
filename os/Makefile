@@ -13,7 +13,7 @@ SOURCES := $(shell find src -name '*')
 # USER_SOURCES := $(shell find ../user/target/riscv64gc-unknown-none-elf/release -name '*.bin')
 USER_SOURCES := $(shell find ../user/src -name '*')
 
-CPUS := 3
+CPUS := 1
 
 QEMUOPTS := -machine virt -m 128M -bios $(SBI_PATH) -nographic $(DEVICE_PARAM) -smp $(CPUS)
 

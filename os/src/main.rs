@@ -25,11 +25,12 @@ mod timer;
 mod mm;
 mod vars;
 mod common;
+mod debug;
 
 use core::arch::{asm, global_asm};
 use core::sync::atomic::AtomicU32;
 use core::sync::atomic::Ordering;
-use log::{info, LevelFilter};
+use log::{info, LevelFilter, trace};
 use vars::*;
 use crate::common::r_tp;
 use crate::mm::KERNEL_SPACE;
@@ -50,7 +51,7 @@ pub fn rust_main(hartid: usize, _dtb: usize) -> ! {
   save_hartid_to_tp(hartid);
   if r_tp() == 0 {
     clear_bss();
-    logging::init(LevelFilter::Trace.into());
+    logging::init(LevelFilter::Off.into());
     info!("bss cleaned");
     mm::init();
     info!("mm inited");
@@ -83,7 +84,7 @@ pub fn rust_main(hartid: usize, _dtb: usize) -> ! {
     STARTED.store(1, Ordering::Release);
   } else {
     while STARTED.load(Ordering::Acquire) == 0 {}
-    println!("hartid {} starting", r_tp());
+    trace!("hartid {} starting", r_tp());
     KERNEL_SPACE.lock().activate();
     trap::init();
     trap::enable_timer_interrupt();
