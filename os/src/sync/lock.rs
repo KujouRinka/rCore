@@ -1,13 +1,51 @@
-use core::cell::UnsafeCell;
 use core::fmt;
+use core::cell::{Cell, UnsafeCell};
 use core::ops::{Deref, DerefMut};
 use core::sync::atomic::AtomicBool;
 use core::sync::atomic::Ordering::{Acquire, Relaxed, Release};
+use crate::common::{pop_off, push_off, r_tp};
+
+pub struct SpinLock(AtomicBool, Cell<isize>);
+
+unsafe impl Send for SpinLock {}
+
+unsafe impl Sync for SpinLock {}
+
+impl SpinLock {
+  pub fn new() -> Self {
+    Self(AtomicBool::new(false), Cell::new(-1))
+  }
+
+  pub fn lock(&self) {
+    push_off();
+    if self.holding() {
+      panic!("SpinLock was locked by current thread");
+    }
+    while let Err(_) = self.0.compare_exchange(false, true, Acquire, Relaxed) {}
+    self.1.set(r_tp() as isize);
+  }
+
+  pub fn unlock(&self) {
+    if !self.holding() {
+      panic!("SpinLock was not locked");
+    }
+    self.1.set(-1);
+    if self.0.swap(false, Release) == false {
+      panic!("SpinLock was not locked");
+    }
+    pop_off();
+  }
+
+  fn holding(&self) -> bool {
+    self.0.load(Relaxed) && self.1.get() == r_tp() as isize
+  }
+}
 
 pub struct SpinMutex<T: ?Sized> {
   /// false: unlocked
   /// true: locked
   futex: AtomicBool,
+  cpu: Cell<isize>,
   data: UnsafeCell<T>,
 }
 
@@ -27,12 +65,18 @@ impl<T> SpinMutex<T> {
   pub const fn new(t: T) -> Self {
     Self {
       futex: AtomicBool::new(false),
+      cpu: Cell::new(-1),
       data: UnsafeCell::new(t),
     }
   }
 
   pub fn lock(&self) -> SpinMutexGuard<'_, T> {
+    push_off();
+    if self.holding() {
+      panic!("SpinLock was locked by current thread");
+    }
     while let Err(_) = self.futex.compare_exchange(false, true, Acquire, Relaxed) {}
+    self.cpu.set(r_tp() as isize);
     unsafe {
       SpinMutexGuard::new(self)
     }
@@ -46,6 +90,10 @@ impl<T> SpinMutex<T> {
   #[allow(unused)]
   pub fn try_lock(&self) {
     unimplemented!()
+  }
+
+  fn holding(&self) -> bool {
+    self.futex.load(Relaxed) && self.cpu.get() == r_tp() as isize
   }
 }
 
@@ -71,9 +119,11 @@ impl<T: ?Sized> DerefMut for SpinMutexGuard<'_, T> {
 
 impl<T: ?Sized> Drop for SpinMutexGuard<'_, T> {
   fn drop(&mut self) {
+    self.lock.cpu.set(-1);
     if self.lock.futex.swap(false, Release) == false {
       panic!("SpinMutexGuard was not locked");
     }
+    pop_off();
   }
 }
 
